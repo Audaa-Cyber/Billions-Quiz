@@ -159,6 +159,17 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+
+        /* Classes to manage padding/margin for screenshot */
+        .screenshot-container-padding {
+            padding: 0 !important;
+        }
+        .screenshot-wrapper-padded {
+            padding: 1rem; /* The 'gap' around the card */
+            background-color: var(--bg-dark); /* Ensure the gap color is consistent */
+            border-radius: 2.5rem; /* Larger radius for the wrapper to contain the card */
+            box-shadow: 0 0 0px 5px rgba(139, 92, 246, 0.1); /* Subtle outer border for visual interest */
+        }
         
         /* New style for selected difficulty on leaderboard filter */
         .leaderboard-filter-btn {
@@ -172,36 +183,6 @@
             color: white;
             font-weight: 700;
             border-color: #22d3ee;
-        }
-
-        /* !!! NEW CSS FOR SCREENSHOT FIX !!! */
-        /* These classes help ensure html2canvas captures the intended background and border-radius */
-        .screenshot-container-padding {
-            padding: 0 !important; /* Remove padding for screenshot context */
-        }
-        .screenshot-wrapper-padded {
-            padding: 1rem; /* The 'gap' around the card */
-            background-color: var(--bg-dark) !important; /* Ensure dark background */
-            border-radius: 2.5rem !important; /* Larger radius for the wrapper to contain the card */
-            box-shadow: 0 0 0px 5px rgba(139, 92, 246, 0.1) !important; /* Subtle outer border for visual interest */
-        }
-        /* Temporary classes for html2canvas text rendering fix */
-        .h2c-text-gradient-fix {
-            color: #22d3ee !important; /* Solid color for screenshot */
-            background: none !important;
-            -webkit-background-clip: unset !important;
-            -webkit-text-fill-color: unset !important;
-        }
-        .h2c-percentage-gradient-fix {
-            color: #0ea5e9 !important; /* Solid color for screenshot */
-            background: none !important;
-            -webkit-background-clip: unset !important;
-            -webkit-text-fill-color: unset !important;
-        }
-        .h2c-blue-glow-fix {
-            background: #3b82f6 !important; /* Solid blue for the glow effect */
-            filter: blur(25px) !important; /* Maintain a blur effect */
-            opacity: 0.7 !important; /* Maintain some transparency */
         }
     </style>
 </head>
@@ -332,9 +313,9 @@
             
 <div id="screenshot-wrapper" class="hidden flex-col items-center justify-center w-full mb-8">
                 <div id="results-card" class="w-full results-card p-6 sm:p-8 relative overflow-hidden">
-                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-500/20 blur-3xl rounded-full" id="blue-glow-circle"></div>
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-500/20 blur-3xl rounded-full"></div>
                     
-                    <h3 class="text-2xl font-black uppercase tracking-wider text-center text-gradient-cyan-blue mb-4 relative z-10" id="results-title-gradient">
+                    <h3 class="text-2xl font-black uppercase tracking-wider text-center text-gradient-cyan-blue mb-4 relative z-10">
                         BILLIONS QUIZ RESULTS
                     </h3>
                     
@@ -581,18 +562,6 @@
             ]
         };
 
-        // --- QUIZ STATE MANAGEMENT ---
-        let currentDifficulty = 'easy';
-        let currentQuestions = [];
-        let currentQuestionIndex = 0;
-        let score = 0;
-        let maxStreak = 0;
-        let currentStreak = 0;
-        let quizTimerInterval = null;
-        let questionTimeout = 0; 
-        let timeLeft = 0;
-        let isQuestionActive = false; 
-
         // --- FIREBASE SETUP ---
         // Global variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -624,468 +593,502 @@
                 
                 // Auth State Listener
                 onAuthStateChanged(auth, (user) => {
-                    userId = user ? user.uid : crypto.randomUUID();
-                    isAuthReady = true;
-                    console.log("Firebase Auth Initialized. User ID:", userId);
-                    // Load the default leaderboard view after auth is ready
-                    loadLeaderboard(currentLeaderboardFilter); 
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        console.log("Firebase Auth Ready. User ID:", userId);
+                        // Start loading the default (easy) leaderboard
+                        filterLeaderboard(currentLeaderboardFilter); 
+                    } else {
+                        // User might be signed in anonymously if token was null
+                        userId = auth.currentUser?.uid || crypto.randomUUID();
+                        isAuthReady = true; 
+                        console.log("Firebase Auth Ready (User ID determined).");
+                        filterLeaderboard(currentLeaderboardFilter);
+                    }
                 });
-            } catch (e) {
-                console.error("Error initializing Firebase:", e);
-                // Fallback for UI if Firebase fails to init
-                isAuthReady = true; 
-                loadLeaderboard(currentLeaderboardFilter);
+
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                document.getElementById('leaderboard-status').textContent = "Error loading leaderboard.";
             }
         }
         
-        // --- QUIZ LOGIC ---
+        // --- LEADERBOARD FILTERING AND RENDERING (UPDATED) ---
 
-        function selectDifficulty(difficulty) {
-            currentDifficulty = difficulty;
-            document.querySelectorAll('.diff-btn').forEach(btn => {
-                if (btn.id === `btn-diff-${difficulty}`) {
-                    btn.classList.add('bg-active-gradient');
-                    btn.classList.remove('bg-inactive');
-                } else {
-                    btn.classList.remove('bg-active-gradient');
-                    btn.classList.add('bg-inactive');
-                }
-            });
-            // Update leaderboard title on the settings screen
+        function filterLeaderboard(difficulty) {
+            currentLeaderboardFilter = difficulty;
+            
+            // Update UI elements
             document.getElementById('leaderboard-title-diff').textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+            
+            document.querySelectorAll('.leaderboard-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.leaderboard-filter-btn[data-filter="${difficulty}"]`).classList.add('active');
+
+            // Trigger data load
+            loadLeaderboard();
         }
 
+        async function loadLeaderboard() {
+            if (!isAuthReady || !db) return;
+
+            const leaderboardList = document.getElementById('leaderboard-list');
+            const leaderboardStatus = document.getElementById('leaderboard-status');
+            leaderboardStatus.textContent = "Fetching scores...";
+
+            try {
+                // Query filtered by difficulty and limited to 100
+                const q = query(
+                    collection(db, LEADERBOARD_COLLECTION_PATH), 
+                    where("difficulty", "==", currentLeaderboardFilter), // Filter by difficulty
+                    limit(LEADERBOARD_LIMIT) 
+                );
+                
+                // Use onSnapshot for real-time updates
+                onSnapshot(q, (snapshot) => {
+                    let scores = [];
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        scores.push(data);
+                    });
+
+                    // Sort locally by score (descending) then by avgTimePerQ (ascending)
+                    scores.sort((a, b) => {
+                        if (b.score !== a.score) {
+                            return b.score - a.score;
+                        }
+                        return a.avgTimePerQ - b.avgTimePerQ;
+                    });
+                    
+                    // Slice to ensure only Top 100 are displayed even if more are fetched/queried without orderBy
+                    const topScores = scores.slice(0, LEADERBOARD_LIMIT);
+
+                    leaderboardList.innerHTML = '';
+                    if (topScores.length === 0) {
+                        leaderboardStatus.style.display = 'block';
+                        leaderboardStatus.textContent = `No ${currentLeaderboardFilter.toUpperCase()} scores yet. Be the first!`;
+                    } else {
+                        leaderboardStatus.style.display = 'none';
+                        topScores.forEach((score, index) => {
+                            const listItem = document.createElement('li');
+                            // Add a visual difference for the top spots
+                            let rankColor = 'text-gray-300';
+                            if (index === 0) rankColor = 'text-yellow-400';
+                            else if (index === 1) rankColor = 'text-gray-400';
+                            else if (index === 2) rankColor = 'text-amber-600';
+
+                            listItem.className = 'flex justify-between items-center text-sm p-2 rounded-lg bg-zinc-900/50';
+                            listItem.innerHTML = `
+                                <span class="font-bold ${rankColor} w-6 text-left">${index + 1}.</span>
+                                <span class="flex-1 font-medium text-white truncate px-2">${score.name}</span>
+                                <span class="text-xs text-cyan-400 font-mono">${score.avgTimePerQ}s AVG</span>
+                                <span class="text-lg font-extrabold text-green-400 ml-4">${score.score}%</span>
+                            `;
+                            leaderboardList.appendChild(listItem);
+                        });
+                    }
+                }, (error) => {
+                    console.error("Error reading leaderboard:", error);
+                    leaderboardStatus.style.display = 'block';
+                    leaderboardStatus.textContent = "Error loading scores: " + error.message;
+                });
+
+            } catch (error) {
+                console.error("Error setting up leaderboard listener:", error);
+                leaderboardStatus.style.display = 'block';
+                leaderboardStatus.textContent = "Error initializing leaderboard. See console.";
+            }
+        }
+
+        async function saveScore(scoreData) {
+            if (!db || !userId) {
+                console.error("Database not ready or User not authenticated.");
+                return;
+            }
+
+            try {
+                await addDoc(collection(db, LEADERBOARD_COLLECTION_PATH), {
+                    ...scoreData,
+                    timestamp: serverTimestamp(),
+                    userId: userId 
+                });
+                console.log("Score saved successfully!");
+            } catch (error) {
+                console.error("Error saving score:", error);
+            }
+        }
+
+        // --- GLOBAL STATE & CONFIG (UNCHANGED) ---
+        const difficultyLevels = {
+            easy: { count: 6, time: 12, name: "Easy" }, 
+            medium: { count: 6, time: 8, name: "Medium" }, 
+            hard: { count: 8, time: 4, name: "Hard" } 
+        };
+
+        let quizSettings = {
+            name: '',
+            difficulty: 'easy', // Default to easy
+            questionCount: difficultyLevels.easy.count,
+            timePerQuestion: difficultyLevels.easy.time,
+        };
+
+        let quizState = {
+            currentQuestionIndex: 0,
+            score: 0, 
+            correctAnswers: 0,
+            incorrectAnswers: 0,
+            timeRemaining: 0, 
+            timerInterval: null,
+            questions: [], 
+            currentStreak: 0,
+            maxStreak: 0,
+            totalTimeTaken: 0, 
+            startTime: Date.now(),
+        };
+
+
+        // --- SCREEN MANAGEMENT ---
+        function showScreen(screenId) {
+            document.getElementById('quiz-settings-screen').classList.add('hidden');
+            document.getElementById('quiz-content').classList.add('hidden');
+            document.getElementById('results-screen').classList.add('hidden');
+            
+            const screen = document.getElementById(screenId);
+            if (screen) {
+                screen.classList.remove('hidden');
+                screen.classList.add('flex');
+            }
+        }
+
+        // --- QUIZ GAME LOGIC (UNCHANGED) ---
+
+        function selectDifficulty(level) {
+            document.querySelectorAll('.diff-btn').forEach(btn => {
+                btn.classList.remove('bg-active-gradient');
+                btn.classList.add('bg-inactive');
+            });
+
+            const selectedBtn = document.getElementById(`btn-diff-${level}`);
+            selectedBtn.classList.remove('bg-inactive');
+            selectedBtn.classList.add('bg-active-gradient');
+
+            quizSettings.difficulty = level;
+            quizSettings.questionCount = difficultyLevels[level].count;
+            quizSettings.timePerQuestion = difficultyLevels[level].time;
+
+            document.getElementById('btn-diff-easy').querySelector('span').textContent = `Easy (${difficultyLevels.easy.count}Q)`;
+            document.getElementById('btn-diff-medium').querySelector('span').textContent = `Medium (${difficultyLevels.medium.count}Q)`;
+            document.getElementById('btn-diff-hard').querySelector('span').textContent = `Hard (${difficultyLevels.hard.count}Q)`;
+            
+            document.getElementById('error-msg').textContent = '';
+        }
+
+        function startGame() {
+            quizSettings.name = document.getElementById('user-name-input').value.trim();
+
+            if (!quizSettings.name) {
+                document.getElementById('error-msg').textContent = 'Please enter your name to begin.';
+                return;
+            }
+            if (!quizSettings.difficulty) {
+                document.getElementById('error-msg').textContent = 'Please select a difficulty level.';
+                return;
+            }
+
+            // Initialize state
+            quizState = {
+                currentQuestionIndex: 0,
+                score: 0, 
+                correctAnswers: 0, 
+                incorrectAnswers: 0,
+                timeRemaining: quizSettings.timePerQuestion,
+                timerInterval: null,
+                questions: [], 
+                currentStreak: 0,
+                maxStreak: 0,
+                totalTimeTaken: 0, 
+                startTime: Date.now(),
+            };
+
+            const selectedQuestions = QUIZ_DATA_BY_DIFFICULTY[quizSettings.difficulty] || [];
+            // Use a local copy of shuffleArray defined later
+            quizState.questions = shuffleArray(selectedQuestions);
+
+
+            // Update UI displays
+            document.getElementById('player-name-display').textContent = quizSettings.name.toUpperCase();
+            document.getElementById('total-q-count').textContent = quizSettings.questionCount;
+            document.getElementById('score-display').textContent = quizState.score;
+            document.getElementById('progress-display').textContent = `1/${quizSettings.questionCount}`;
+            document.getElementById('time-remaining-display').textContent = `${quizSettings.timePerQuestion}s`;
+            
+            showScreen('quiz-content');
+            renderQuestion();
+        }
+        
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [array[i], array[j]] = [array[j], array[i]];
             }
+            return array;
         }
 
-        function startGame() {
-            const userName = document.getElementById('user-name-input').value.trim();
-            if (!userName || userName.length < 2) {
-                document.getElementById('error-msg').textContent = "Please enter a valid name (min 2 characters).";
-                return;
-            }
-            document.getElementById('error-msg').textContent = ""; 
-            
-            // Set initial state
-            currentQuestions = [...QUIZ_DATA_BY_DIFFICULTY[currentDifficulty]];
-            shuffleArray(currentQuestions);
-            currentQuestionIndex = 0;
-            score = 0;
-            currentStreak = 0;
-            maxStreak = 0;
-            questionTimeout = getQuestionTime(currentDifficulty);
-            
-            // Update UI displays
-            document.getElementById('player-name-display').textContent = userName.toUpperCase();
-            document.getElementById('score-display').textContent = score;
-            document.getElementById('total-q-count').textContent = currentQuestions.length;
-            
-            // Start the quiz flow
-            showScreen('quiz-content');
-            loadQuestion();
-        }
-
-        function getQuestionTime(difficulty) {
-            switch(difficulty) {
-                case 'easy': return 12;
-                case 'medium': return 8;
-                case 'hard': return 4;
-                default: return 10;
-            }
-        }
-
-        function loadQuestion() {
-            if (currentQuestionIndex >= currentQuestions.length) {
-                endQuiz();
+        function renderQuestion() {
+            if (quizState.currentQuestionIndex >= quizState.questions.length) {
+                endGame();
                 return;
             }
 
-            const qData = currentQuestions[currentQuestionIndex];
+            const q = quizState.questions[quizState.currentQuestionIndex];
             
-            // Reset state for new question
-            clearInterval(quizTimerInterval);
-            timeLeft = questionTimeout;
-            isQuestionActive = true;
-            document.getElementById('feedback-message').textContent = "";
-            
-            // Update progress
-            document.getElementById('progress-display').textContent = `${currentQuestionIndex + 1}/${currentQuestions.length}`;
-            document.getElementById('current-q-num').textContent = currentQuestionIndex + 1;
-            
-            // Update question text
-            document.getElementById('question-text').textContent = qData.question;
-            
-            // Render choices
+            // Update question info
+            document.getElementById('current-q-num').textContent = quizState.currentQuestionIndex + 1;
+            document.getElementById('progress-display').textContent = `${quizState.currentQuestionIndex + 1}/${quizSettings.questionCount}`;
+            document.getElementById('question-text').textContent = q.question;
+            document.getElementById('feedback-message').textContent = '';
+
             const choicesContainer = document.getElementById('choices-container');
             choicesContainer.innerHTML = '';
-            shuffleArray(qData.answerOptions); // Shuffle answers for variation
-            
-            qData.answerOptions.forEach((option, index) => {
+
+            const shuffledOptions = shuffleArray([...q.answerOptions]);
+
+            shuffledOptions.forEach((option, index) => {
                 const button = document.createElement('button');
-                button.className = 'answer-button w-full p-4 text-left rounded-xl text-lg font-semibold shadow-md transition-all duration-200';
+                button.className = `answer-button w-full text-left p-3 rounded-xl font-medium shadow-md transition-all duration-200`;
+                button.setAttribute('data-option-text', option.text); 
                 button.textContent = option.text;
-                button.onclick = () => handleAnswer(option.isCorrect, button);
-                button.setAttribute('data-is-correct', option.isCorrect);
+                button.onclick = () => handleAnswer(option, button);
                 choicesContainer.appendChild(button);
             });
             
-            // Start the timer
+            clearInterval(quizState.timerInterval);
+            quizState.timeRemaining = quizSettings.timePerQuestion;
             startTimer();
+            updateTimerBar(quizSettings.timePerQuestion);
         }
 
         function startTimer() {
-            const timerBar = document.getElementById('timer-bar');
             const timeDisplay = document.getElementById('time-remaining-display');
             
-            // Set initial bar width and smooth transition for the whole duration
-            timerBar.style.width = '100%';
-            timerBar.style.transition = `width ${timeLeft}s linear`;
-            
-            // Start the bar shrinking immediately
-            requestAnimationFrame(() => {
-                timerBar.style.width = '0%';
-            });
+            quizState.timerInterval = setInterval(() => {
+                quizState.timeRemaining -= 1;
+                timeDisplay.textContent = `${quizState.timeRemaining}s`;
+                updateTimerBar(quizState.timePerQuestion);
 
-            timeDisplay.textContent = `${timeLeft}s`;
-
-            quizTimerInterval = setInterval(() => {
-                timeLeft -= 1;
-                if (timeLeft >= 0) {
-                    timeDisplay.textContent = `${timeLeft}s`;
-                } else {
-                    // Time's up: treat as an incorrect answer
-                    clearInterval(quizTimerInterval);
-                    handleAnswer(false, null, true); // Pass true for isTimeout
+                if (quizState.timeRemaining <= 0) {
+                    clearInterval(quizState.timerInterval);
+                    handleAnswer({ isCorrect: false }, null, true); 
                 }
             }, 1000);
         }
 
-        function handleAnswer(isCorrect, selectedButton, isTimeout = false) {
-            if (!isQuestionActive) return; // Prevent multiple answers
-            isQuestionActive = false;
-            clearInterval(quizTimerInterval);
-            
-            // Stop the timer bar animation by setting transition to none, and width to current value
+        function updateTimerBar(remainingTime) {
             const timerBar = document.getElementById('timer-bar');
-            const currentWidth = timerBar.offsetWidth / timerBar.parentElement.offsetWidth * 100;
-            timerBar.style.transition = 'none';
-            timerBar.style.width = `${currentWidth}%`;
-
-            const choices = document.querySelectorAll('#choices-container button');
+            const totalTime = quizSettings.timePerQuestion;
+            const percentage = (remainingTime / totalTime) * 100;
             
-            choices.forEach(btn => {
-                btn.disabled = true; // Disable all buttons
-                if (btn.getAttribute('data-is-correct') === 'true') {
-                    // Highlight the correct answer
-                    btn.classList.add('bg-green-600', 'text-white', 'shadow-lg');
-                    btn.classList.remove('answer-button');
-                } else if (btn === selectedButton) {
-                    // Highlight the incorrect selection
-                    btn.classList.add('bg-red-600', 'text-white', 'shadow-lg');
-                    btn.classList.remove('answer-button');
-                }
+            timerBar.style.transition = 'width 1s linear';
+            timerBar.style.width = `${percentage}%`;
+        }
+
+        function disableAllChoices() {
+            document.querySelectorAll('.answer-button').forEach(btn => {
+                btn.disabled = true;
+                btn.onclick = null; 
             });
+        }
 
-            const feedback = document.getElementById('feedback-message');
+        function handleAnswer(selectedOption, clickedButton, isTimeout = false) {
+            clearInterval(quizState.timerInterval);
+            disableAllChoices();
 
-            if (isCorrect) {
-                score++;
-                currentStreak++;
-                maxStreak = Math.max(maxStreak, currentStreak);
-                feedback.textContent = `Correct! Streak: ${currentStreak}`;
-                feedback.classList.remove('text-red-500', 'text-yellow-300');
-                feedback.classList.add('text-green-500');
-                document.getElementById('score-display').textContent = score;
+            const feedbackMessage = document.getElementById('feedback-message');
+            const questionTimeTaken = quizSettings.timePerQuestion - quizState.timeRemaining;
+            
+            quizState.totalTimeTaken += questionTimeTaken;
+
+            if (selectedOption.isCorrect) {
+                quizState.score += 1; 
+                quizState.correctAnswers += 1;
+                quizState.currentStreak += 1;
+                feedbackMessage.textContent = 'Correct!';
+                feedbackMessage.className = 'mt-4 text-center text-sm font-bold h-6 text-green-400';
+                
+                if (clickedButton) {
+                    clickedButton.classList.remove('answer-button', 'bg-inactive');
+                    clickedButton.classList.add('bg-green-600', 'text-white', 'shadow-green-500/50');
+                }
             } else {
-                currentStreak = 0;
+                quizState.incorrectAnswers += 1;
+                quizState.maxStreak = Math.max(quizState.maxStreak, quizState.currentStreak);
+                quizState.currentStreak = 0;
+
                 if (isTimeout) {
-                    feedback.textContent = "Time's Up! No point.";
-                    feedback.classList.remove('text-green-500', 'text-red-500');
-                    feedback.classList.add('text-yellow-300');
+                    feedbackMessage.textContent = 'Time Out! Incorrect.';
                 } else {
-                    feedback.textContent = "Incorrect. Streak lost.";
-                    feedback.classList.remove('text-green-500', 'text-yellow-300');
-                    feedback.classList.add('text-red-500');
+                    feedbackMessage.textContent = 'Incorrect.';
+                    if (clickedButton) {
+                        clickedButton.classList.remove('answer-button', 'bg-inactive');
+                        clickedButton.classList.add('bg-red-600', 'text-white', 'shadow-red-500/50');
+                    }
+                }
+                feedbackMessage.className = 'mt-4 text-center text-sm font-bold h-6 text-red-400';
+
+                const q = quizState.questions[quizState.currentQuestionIndex];
+                const correctOption = q.answerOptions.find(option => option.isCorrect);
+                
+                const correctBtn = Array.from(document.querySelectorAll('#choices-container button')).find(
+                    btn => btn.getAttribute('data-option-text') === correctOption.text
+                );
+
+                if(correctBtn) {
+                   correctBtn.classList.add('border-2', 'border-green-400', 'shadow-lg', 'shadow-green-500/30', 'bg-zinc-700/50');
                 }
             }
 
-            // Move to the next question after a brief delay
+            document.getElementById('score-display').textContent = quizState.score;
+            
+            quizState.maxStreak = Math.max(quizState.maxStreak, quizState.currentStreak);
+
             setTimeout(() => {
-                currentQuestionIndex++;
-                loadQuestion();
-            }, isTimeout ? 2000 : 1500); // Longer delay for timeout
+                quizState.currentQuestionIndex += 1;
+                if (quizState.currentQuestionIndex < quizState.questions.length) {
+                    renderQuestion();
+                } else {
+                    endGame(); 
+                }
+            }, 1500);
         }
 
-        function endQuiz() {
-            showScreen('results-screen');
+        function endGame() {
+            clearInterval(quizState.timerInterval);
             
-            // --- Calculate Results ---
-            const totalQuestions = currentQuestions.length;
-            const finalScore = score;
-            const percentage = totalQuestions > 0 ? Math.round((finalScore / totalQuestions) * 100) : 0;
-            const userName = document.getElementById('user-name-input').value.trim();
-            const timePerQ = getQuestionTime(currentDifficulty);
-
-            // --- Update Result Screen UI ---
-            document.getElementById('player-name-result').textContent = userName;
-            document.getElementById('player-name-result-card').textContent = userName;
-            document.getElementById('level-q-count-result').textContent = 
-                `${currentDifficulty.toUpperCase()} LEVEL • ${totalQuestions} QUESTIONS`;
-            document.getElementById('final-percentage').textContent = `${percentage}%`;
-            document.getElementById('result-total-questions').textContent = totalQuestions;
-            document.getElementById('result-time-per-q').textContent = `${timePerQ}s`;
-            document.getElementById('result-max-streak').textContent = maxStreak;
-            document.getElementById('result-date').textContent = new Date().toLocaleDateString('en-US', {
-                year: 'numeric', month: 'long', day: 'numeric'
-            });
-
-            // Intuition/IQ Message
-            let message = "";
-            let iqMessage = "";
-            if (percentage === 100) {
-                iqMessage = "MASTER BILLIONAIRE";
-                message = "You have an impeccable understanding of Billions Network. True verification mastery!";
-            } else if (percentage >= 80) {
-                iqMessage = "VERIFIED ELITE";
-                message = "Excellent knowledge! You are definitely ready to participate in the network.";
-            } else if (percentage >= 60) {
-                iqMessage = "SOLID INTUITION";
-                message = "A strong performance. Just a little more focus will get you to the elite level.";
-            } else if (percentage >= 40) {
-                iqMessage = "LEARNING PHASE";
-                message = "You have some foundational knowledge, but need to review the core concepts.";
+            const totalQuestions = quizSettings.questionCount;
+            const finalScorePercentage = totalQuestions > 0 ? Math.round((quizState.correctAnswers / totalQuestions) * 100) : 0;
+            const avgTimePerQ = totalQuestions > 0 ? (quizState.totalTimeTaken / totalQuestions).toFixed(1) : 0;
+            
+            let iqMessage, resultText;
+            if (finalScorePercentage >= 80) {
+                // Modified: Removed "AGENT" and "trusted validator" reference
+                iqMessage = "MASTER BILLIONS KNOWLEDGE";
+                resultText = "Exceptional mastery of the Billions Network Identity concepts. You've earned your place in the Trust Layer!";
+            } else if (finalScorePercentage >= 60) {
+                 // Modified: Removed "AGENT"
+                iqMessage = "HIGH KNOWLEDGE LEVEL";
+                resultText = "Strong comprehension of the core Identity and Verification concepts. You understand Proof of Uniqueness well. ";
+            } else if (finalScorePercentage >= 40) {
+                iqMessage = "DEVELOPING KNOWLEDGE";
+                resultText = "Start paying closer attention to the key principles of the Identity and Verification mechanisms. Review the documentation!";
             } else {
-                iqMessage = "NOVICE";
-                message = "Your knowledge base needs to be solidified. Review the core concepts and try again!";
+                // Modified: Removed "AGENT"
+                iqMessage = "NOVICE LEVEL";
+                resultText = "Your knowledge base needs to be solidified. Review the core concepts and try again!";
             }
+
+            // Update result screen elements
+            document.getElementById('player-name-result').textContent = quizSettings.name;
+            document.getElementById('player-name-result-card').textContent = quizSettings.name;
+            document.getElementById('level-q-count-result').textContent = `${quizSettings.difficulty.toUpperCase()} LEVEL • ${totalQuestions} QUESTIONS`;
+            document.getElementById('final-percentage').textContent = `${finalScorePercentage}%`;
             document.getElementById('intuition-iq-message').textContent = iqMessage;
-            document.getElementById('result-message').textContent = message;
+            document.getElementById('result-total-questions').textContent = totalQuestions;
+            document.getElementById('result-time-per-q').textContent = `${avgTimePerQ}s`;
+            document.getElementById('result-max-streak').textContent = quizState.maxStreak;
+            document.getElementById('result-message').textContent = resultText;
+            document.getElementById('result-date').textContent = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-            // Submit result to leaderboard
-            submitLeaderboardScore(userName, finalScore, totalQuestions, currentDifficulty, maxStreak, percentage);
-        }
+            const screenshotWrapper = document.getElementById('screenshot-wrapper');
+            screenshotWrapper.classList.remove('hidden');
+            screenshotWrapper.classList.add('flex'); 
 
-        // --- FIREBASE LEADERBOARD FUNCTIONS ---
-
-        // Submits the final score to Firestore
-        async function submitLeaderboardScore(name, score, total, difficulty, streak, percentage) {
-            if (!db || !isAuthReady) {
-                console.error("Firebase not ready for score submission.");
-                return;
-            }
-
-            try {
-                // Generate a score ID using the user ID and timestamp to ensure uniqueness per session
-                const docRef = doc(collection(db, LEADERBOARD_COLLECTION_PATH));
-
-                const scoreData = {
-                    name: name,
-                    score: score,
-                    total: total,
-                    percentage: percentage, // Store percentage for easier display/sorting
-                    difficulty: difficulty,
-                    maxStreak: streak,
-                    timestamp: serverTimestamp(),
-                    userId: userId, // Link score to user
-                };
-
-                await setDoc(docRef, scoreData);
-                console.log("Score submitted successfully with ID:", docRef.id);
-            } catch (e) {
-                console.error("Error adding document: ", e);
-            }
-        }
-        
-        // Attaches a real-time listener to the leaderboard
-        function loadLeaderboard(difficultyFilter) {
-            if (!db || !isAuthReady) {
-                document.getElementById('leaderboard-status').textContent = "Waiting for connection...";
-                return;
-            }
-            
-            document.getElementById('leaderboard-status').textContent = "Loading scores...";
-            currentLeaderboardFilter = difficultyFilter;
-
-            const q = query(
-                collection(db, LEADERBOARD_COLLECTION_PATH),
-                where("difficulty", "==", difficultyFilter),
-                // IMPORTANT: We do NOT use orderBy() here to avoid mandatory index creation.
-                limit(LEADERBOARD_LIMIT) 
-            );
-
-            // Filter button active state management
-            document.querySelectorAll('.leaderboard-filter-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.getAttribute('data-filter') === difficultyFilter);
+            // Save score to leaderboard
+            saveScore({
+                name: quizSettings.name,
+                score: finalScorePercentage,
+                difficulty: quizSettings.difficulty,
+                avgTimePerQ: parseFloat(avgTimePerQ),
+                maxStreak: quizState.maxStreak
             });
-            document.getElementById('leaderboard-title-diff').textContent = difficultyFilter.charAt(0).toUpperCase() + difficultyFilter.slice(1);
-            
-            // Set up real-time listener
-            onSnapshot(q, (snapshot) => {
-                let scores = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                }));
-                
-                // Client-side sorting is mandatory to avoid index errors with orderBy
-                scores.sort((a, b) => {
-                    if (a.percentage !== b.percentage) {
-                        return b.percentage - a.percentage; // Primary: Higher percentage first
-                    }
-                    if (a.score !== b.score) {
-                         return b.score - a.score; // Secondary: Higher score first
-                    }
-                    // Tertiary: Earlier time first (for tie-breaking on similar scores)
-                    const timeA = a.timestamp?.seconds || 0;
-                    const timeB = b.timestamp?.seconds || 0;
-                    return timeA - timeB; 
-                });
 
-                renderLeaderboard(scores);
-
-            }, (error) => {
-                console.error("Error fetching leaderboard:", error);
-                document.getElementById('leaderboard-status').textContent = "Failed to load scores.";
-            });
-        }
-        
-        // Function to be called from HTML onclick
-        function filterLeaderboard(difficulty) {
-             // Simply call loadLeaderboard with the new filter
-             loadLeaderboard(difficulty);
+            showScreen('results-screen');
         }
 
-
-        function renderLeaderboard(scores) {
-            const list = document.getElementById('leaderboard-list');
-            const status = document.getElementById('leaderboard-status');
-            list.innerHTML = '';
-            
-            if (scores.length === 0) {
-                status.textContent = `No scores recorded for ${currentLeaderboardFilter.toUpperCase()} yet.`;
-                status.classList.remove('hidden');
-                return;
-            }
-            
-            status.classList.add('hidden'); // Hide status message if scores exist
-
-            scores.slice(0, 10).forEach((scoreEntry, index) => { // Show top 10
-                const isCurrentUser = scoreEntry.userId === userId;
-                
-                const listItem = document.createElement('li');
-                listItem.className = `flex justify-between items-center p-3 rounded-lg shadow-md transition-all duration-200 ${
-                    isCurrentUser 
-                        ? 'bg-blue-600 border border-cyan-400 text-white transform scale-[1.02]' 
-                        : 'bg-zinc-800 border border-zinc-700 text-gray-200'
-                }`;
-                
-                const rank = index + 1;
-                const rankClass = rank === 1 ? 'text-2xl font-black text-cyan-400' :
-                                 rank === 2 ? 'text-xl font-bold text-cyan-500' :
-                                 rank === 3 ? 'text-lg font-semibold text-cyan-600' :
-                                 'text-base font-semibold text-gray-400';
-
-                listItem.innerHTML = `
-                    <span class="${rankClass} w-8 text-left">${rank}.</span>
-                    <span class="flex-1 font-bold text-left truncate mx-2">${scoreEntry.name}</span>
-                    <span class="font-bold text-lg ${isCurrentUser ? 'text-yellow-300' : 'text-cyan-400'}">${scoreEntry.percentage}%</span>
-                `;
-                list.appendChild(listItem);
-            });
-        }
-
-        // --- SCREEN AND VISUAL UTILITIES ---
-
-        function showScreen(screenId) {
-            ['quiz-settings-screen', 'quiz-content', 'results-screen'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-                document.getElementById(id).classList.remove('flex-col');
-            });
-            document.getElementById(screenId).classList.remove('hidden');
-            document.getElementById(screenId).classList.add('flex-col');
-
-            // Special handling for screenshot wrapper visibility on results screen
-            if (screenId === 'results-screen') {
-                document.getElementById('screenshot-wrapper').classList.remove('hidden');
-                document.getElementById('screenshot-wrapper').classList.add('flex-col');
-            } else {
-                document.getElementById('screenshot-wrapper').classList.add('hidden');
-                document.getElementById('screenshot-wrapper').classList.remove('flex-col');
-            }
-        }
-        
-        // --- SCREENSHOT & SHARE UTILITIES ---
+        // --- DOWNLOAD AND SHARE FUNCTIONS (UPDATED) ---
 
         async function downloadResults() {
+            const resultsCardContainer = document.getElementById('results-screen');
             const resultsCard = document.getElementById('results-card');
             const screenshotWrapper = document.getElementById('screenshot-wrapper');
+            const appContainer = document.getElementById('app-container');
 
-            // 1. Prepare for screenshot: Apply temporary classes for background and gradient fixes
-            screenshotWrapper.classList.add('screenshot-wrapper-padded');
-            resultsCard.classList.add('screenshot-container-padding');
+            // 1. Prepare for screenshot: add wrapper for curved edges and gap
+            screenshotWrapper.classList.remove('flex');
+            screenshotWrapper.classList.add('screenshot-wrapper-padded'); 
+            appContainer.classList.add('screenshot-container-padding'); 
+            
+            try {
+                const canvas = await html2canvas(screenshotWrapper, {
+                    backgroundColor: null, 
+                    useCORS: true,
+                    scale: 2 
+                });
 
-            // Temporarily replace gradients with solid colors for text/percentage for better canvas capture
-            const resultsTitle = document.getElementById('results-title-gradient');
-            const finalPercentage = document.getElementById('final-percentage');
-            const blueGlowCircle = document.getElementById('blue-glow-circle');
-
-            resultsTitle.classList.add('h2c-text-gradient-fix');
-            finalPercentage.classList.add('h2c-percentage-gradient-fix');
-            blueGlowCircle.classList.add('h2c-blue-glow-fix');
-
-
-            // 2. Capture the card using html2canvas
-            const canvas = await html2canvas(resultsCard, {
-                // Ensure the full background is rendered correctly
-                backgroundColor: resultsCard.style.backgroundColor, 
-                // Set scale higher for better resolution
-                scale: 3, 
-                // Use a proper image type
-                type: 'dataURL',
-                allowTaint: true,
-                useCORS: true, 
-            });
-
-            // 3. Cleanup: Remove temporary classes
-            resultsTitle.classList.remove('h2c-text-gradient-fix');
-            finalPercentage.classList.remove('h2c-percentage-gradient-fix');
-            blueGlowCircle.classList.remove('h2c-blue-glow-fix');
-            screenshotWrapper.classList.remove('screenshot-wrapper-padded');
-            resultsCard.classList.remove('screenshot-container-padding');
-
-            // 4. Download the image
-            const imageURL = canvas.toDataURL("image/png");
-            const userName = document.getElementById('user-name-input').value.trim().replace(/\s/g, '_');
-            const date = new Date().toISOString().split('T')[0];
-            const link = document.createElement('a');
-            link.href = imageURL;
-            link.download = `Billions_Quiz_Result_${userName}_${date}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+                const dataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `Billions_Quiz_Result_${quizSettings.name.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (error) {
+                console.error("Error generating screenshot:", error);
+            } finally {
+                // 3. Clean up: restore original styles
+                screenshotWrapper.classList.remove('screenshot-wrapper-padded');
+                screenshotWrapper.classList.add('flex'); 
+                appContainer.classList.remove('screenshot-container-padding');
+            }
         }
-        
+
         function shareOnX() {
-            const userName = document.getElementById('user-name-input').value.trim();
-            const percentage = document.getElementById('final-percentage').textContent;
+            const finalScorePercentage = document.getElementById('final-percentage').textContent;
             const iqMessage = document.getElementById('intuition-iq-message').textContent;
-            const difficulty = currentDifficulty.toUpperCase();
+            const difficulty = quizSettings.difficulty.toUpperCase();
             
+            // NOTE: The app link is dynamically determined by the hosting environment, 
+            // but we must use a placeholder or assume a variable for the tweet text.
+            // Since we don't have access to the Canvas link, we'll use a descriptive placeholder.
+            const appLinkPlaceholder = "Check out the Billions Quiz!";
+
+            // --- START MODIFIED TEXT ---
             const text = encodeURIComponent(
-                `I just took the Billions Network Identity Quiz (${difficulty} Level) and scored a ${percentage} (${iqMessage})! 🚀 \n\nCheck your knowledge on identity verification and AI agents! #BillionsNetwork #VerifiedIdentity`
+                `I just completed the Billions Quiz!\n\n` +
+                `My Score: ${finalScorePercentage}\n` +
+                `IQ Level: ${iqMessage}\n` +
+                `Difficulty: ${difficulty}\n\n` +
+                `Share your results and join the Trust Layer!\n\n` +
+                `${appLinkPlaceholder}\n\n` + // Placeholder link text
+                `@billions_ntwk @jgonzalezferrer`
             );
+            // --- END MODIFIED TEXT ---
             
-            const url = `https://twitter.com/intent/tweet?text=${text}`;
-            window.open(url, '_blank');
+            window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
         }
 
         // --- INITIALIZATION ---
         window.onload = () => {
             initFirebase();
-            selectDifficulty(currentDifficulty); // Initialize button state
+            // Set initial selection visually for quiz settings
+            selectDifficulty('easy');
+            // Set initial selection visually for leaderboard filter
+            filterLeaderboard('easy');
             showScreen('quiz-settings-screen');
         };
+
     </script>
+
+</body>
+</html>
