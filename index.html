@@ -171,19 +171,7 @@
             box-shadow: 0 0 0px 5px rgba(139, 92, 246, 0.1); /* Subtle outer border for visual interest */
         }
         
-        /* New style for selected difficulty on leaderboard filter */
-        .leaderboard-filter-btn {
-            background-color: #262626; 
-            color: #94a3b8; /* slate-400 */
-            border: 1px solid #3f3f46;
-            transition: all 0.2s;
-        }
-        .leaderboard-filter-btn.active {
-            background: linear-gradient(to right, #0ea5e9, #22d3ee); /* Blue to Cyan */
-            color: white;
-            font-weight: 700;
-            border-color: #22d3ee;
-        }
+      
     </style>
 </head>
 <body class="p-4">
@@ -236,19 +224,6 @@
             <p id="error-msg" class="text-red-500 text-xs mt-0 mb-4 h-4"></p>
 
             
-<div class="w-full">
-                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3 text-center border-t pt-4 border-zinc-800">GLOBAL LEADERBOARD (<span id="leaderboard-title-diff">Easy</span>)</h3>
-                
-                <div class="flex justify-center gap-2 mb-4">
-                    <button class="leaderboard-filter-btn rounded-full px-4 py-1 text-xs" data-filter="easy" onclick="filterLeaderboard('easy')">Easy</button>
-                    <button class="leaderboard-filter-btn rounded-full px-4 py-1 text-xs" data-filter="medium" onclick="filterLeaderboard('medium')">Medium</button>
-                    <button class="leaderboard-filter-btn rounded-full px-4 py-1 text-xs" data-filter="hard" onclick="filterLeaderboard('hard')">Hard</button>
-                </div>
-
-                <div id="leaderboard-container" class="w-full bg-[#121212] p-4 rounded-xl shadow-inner border border-zinc-800">
-                    <p id="leaderboard-status" class="text-center text-sm text-gray-500">Loading scores...</p>
-                    <ul id="leaderboard-list" class="space-y-2">
-                        
 </ul>
                 </div>
             </div>
@@ -389,8 +364,7 @@
         window.showScreen = showScreen;
         window.downloadResults = downloadResults; 
         window.shareOnX = shareOnX; 
-        window.filterLeaderboard = filterLeaderboard; // New function for filtering
-
+       
         // --- QUIZ DATA (Structured by Difficulty) ---
         const QUIZ_DATA_BY_DIFFICULTY = {
             easy: [
@@ -561,164 +535,6 @@
                 },
             ]
         };
-
-        // --- FIREBASE SETUP ---
-        // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let db, auth, userId = null;
-        let isAuthReady = false;
-        
-        // Define the Firestore collection path for the public leaderboard
-        const LEADERBOARD_COLLECTION_PATH = `artifacts/${appId}/public/data/leaderboard`;
-        
-        // State for Leaderboard Filtering (New)
-        let currentLeaderboardFilter = 'easy'; // Default filter
-        const LEADERBOARD_LIMIT = 100; // New limit
-
-        async function initFirebase() {
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                
-                // Authentication
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                // Auth State Listener
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        isAuthReady = true;
-                        console.log("Firebase Auth Ready. User ID:", userId);
-                        // Start loading the default (easy) leaderboard
-                        filterLeaderboard(currentLeaderboardFilter); 
-                    } else {
-                        // User might be signed in anonymously if token was null
-                        userId = auth.currentUser?.uid || crypto.randomUUID();
-                        isAuthReady = true; 
-                        console.log("Firebase Auth Ready (User ID determined).");
-                        filterLeaderboard(currentLeaderboardFilter);
-                    }
-                });
-
-            } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                document.getElementById('leaderboard-status').textContent = "Error loading leaderboard.";
-            }
-        }
-        
-        // --- LEADERBOARD FILTERING AND RENDERING (UPDATED) ---
-
-        function filterLeaderboard(difficulty) {
-            currentLeaderboardFilter = difficulty;
-            
-            // Update UI elements
-            document.getElementById('leaderboard-title-diff').textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-            
-            document.querySelectorAll('.leaderboard-filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.querySelector(`.leaderboard-filter-btn[data-filter="${difficulty}"]`).classList.add('active');
-
-            // Trigger data load
-            loadLeaderboard();
-        }
-
-        async function loadLeaderboard() {
-            if (!isAuthReady || !db) return;
-
-            const leaderboardList = document.getElementById('leaderboard-list');
-            const leaderboardStatus = document.getElementById('leaderboard-status');
-            leaderboardStatus.textContent = "Fetching scores...";
-
-            try {
-                // Query filtered by difficulty and limited to 100
-                const q = query(
-                    collection(db, LEADERBOARD_COLLECTION_PATH), 
-                    where("difficulty", "==", currentLeaderboardFilter), // Filter by difficulty
-                    limit(LEADERBOARD_LIMIT) 
-                );
-                
-                // Use onSnapshot for real-time updates
-                onSnapshot(q, (snapshot) => {
-                    let scores = [];
-                    snapshot.forEach((doc) => {
-                        const data = doc.data();
-                        scores.push(data);
-                    });
-
-                    // Sort locally by score (descending) then by avgTimePerQ (ascending)
-                    scores.sort((a, b) => {
-                        if (b.score !== a.score) {
-                            return b.score - a.score;
-                        }
-                        return a.avgTimePerQ - b.avgTimePerQ;
-                    });
-                    
-                    // Slice to ensure only Top 100 are displayed even if more are fetched/queried without orderBy
-                    const topScores = scores.slice(0, LEADERBOARD_LIMIT);
-
-                    leaderboardList.innerHTML = '';
-                    if (topScores.length === 0) {
-                        leaderboardStatus.style.display = 'block';
-                        leaderboardStatus.textContent = `No ${currentLeaderboardFilter.toUpperCase()} scores yet. Be the first!`;
-                    } else {
-                        leaderboardStatus.style.display = 'none';
-                        topScores.forEach((score, index) => {
-                            const listItem = document.createElement('li');
-                            // Add a visual difference for the top spots
-                            let rankColor = 'text-gray-300';
-                            if (index === 0) rankColor = 'text-yellow-400';
-                            else if (index === 1) rankColor = 'text-gray-400';
-                            else if (index === 2) rankColor = 'text-amber-600';
-
-                            listItem.className = 'flex justify-between items-center text-sm p-2 rounded-lg bg-zinc-900/50';
-                            listItem.innerHTML = `
-                                <span class="font-bold ${rankColor} w-6 text-left">${index + 1}.</span>
-                                <span class="flex-1 font-medium text-white truncate px-2">${score.name}</span>
-                                <span class="text-xs text-cyan-400 font-mono">${score.avgTimePerQ}s AVG</span>
-                                <span class="text-lg font-extrabold text-green-400 ml-4">${score.score}%</span>
-                            `;
-                            leaderboardList.appendChild(listItem);
-                        });
-                    }
-                }, (error) => {
-                    console.error("Error reading leaderboard:", error);
-                    leaderboardStatus.style.display = 'block';
-                    leaderboardStatus.textContent = "Error loading scores: " + error.message;
-                });
-
-            } catch (error) {
-                console.error("Error setting up leaderboard listener:", error);
-                leaderboardStatus.style.display = 'block';
-                leaderboardStatus.textContent = "Error initializing leaderboard. See console.";
-            }
-        }
-
-        async function saveScore(scoreData) {
-            if (!db || !userId) {
-                console.error("Database not ready or User not authenticated.");
-                return;
-            }
-
-            try {
-                await addDoc(collection(db, LEADERBOARD_COLLECTION_PATH), {
-                    ...scoreData,
-                    timestamp: serverTimestamp(),
-                    userId: userId 
-                });
-                console.log("Score saved successfully!");
-            } catch (error) {
-                console.error("Error saving score:", error);
-            }
-        }
 
         // --- GLOBAL STATE & CONFIG (UNCHANGED) ---
         const difficultyLevels = {
@@ -1069,7 +885,7 @@
                 `My Score: ${finalScorePercentage}\n` +
                 `IQ Level: ${iqMessage}\n` +
                 `Difficulty: ${difficulty}\n\n` +
-                `Share your results and join the Trust Layer!\n\n` +
+                `join the Trust Layer and Share your results\n\n` +
                 `${appLinkPlaceholder}\n\n` + // Placeholder link text
                 `@billions_ntwk @jgonzalezferrer`
             );
@@ -1092,3 +908,4 @@
 
 </body>
 </html>
+
