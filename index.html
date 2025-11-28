@@ -1,1094 +1,339 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Billions Network Identity Quiz</title>
-    
-<script src="https://cdn.tailwindcss.com"></script>
-    
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         /* Custom styles for the dark theme and font */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-        
-        :root {
-            --bg-dark: #0a0a0a;
-            --card-dark: #1e1e1e;
-            --card-hover: #27272a;
-            --text-main: #ffffff;
-            --text-sub: #a1a1aa;
-            
-            --gradient-start: #22d3ee; /* Bright Cyan */
-            --gradient-middle: #3b82f6; /* Blue-500 */
-            --gradient-end: #8b5cf6;   /* Violet-500 */
-            
-            --title-start: #22d3ee;
-            --title-end: #22d3ee;
-        }
+        :root{--bg-dark:#0a0a0a;--card-dark:#1e1e1e;--card-hover:#27272a;--text-main:#fff;--text-sub:#a1a1aa;--gradient-start:#22d3ee;--gradient-middle:#3b82f6;--gradient-end:#8b5cf6;--title-start:#22d3ee;--title-end:#22d3ee}
+        html { font-size: clamp(14px, 1.6vw, 18px); }
+        body{font-family:Inter, sans-serif;background-color:var(--bg-dark);color:var(--text-main);min-height:100vh;display:flex;align-items:center;justify-content:center;border:3px solid rgba(139,92,246,.1);box-shadow:0 0 50px rgba(59,130,246,.1);margin:0}
+        #app-container{width:100%;max-width:480px;min-width:320px;background-color:var(--bg-dark)}
+        .title-glow{background:linear-gradient(to right,var(--title-start),var(--title-end));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 20px rgba(34,211,238,.6)}
+        .bg-active-gradient{background:linear-gradient(135deg,var(--gradient-start),var(--gradient-middle));color:#fff;border:none;font-weight:800;box-shadow:0 0 15px rgba(34,211,238,.4);transition:transform .2s,box-shadow .2s}
+        .bg-active-gradient:hover{transform:scale(1.02);opacity:.95}
+        .bg-inactive{background-color:var(--card-dark);color:var(--text-sub);border:1px solid #27272a;box-shadow:0 0 10px rgba(0,0,0,.5)}
+        .input-field{background-color:var(--card-dark);border:1px solid #27272a;color:var(--text-main);padding:.75rem 1rem;border-radius:.75rem}
+        .quiz-stat-box{background-color:#1a1a1a;border:1px solid #333;padding:.5rem}
+        .answer-button{background-color:#262626;color:#ccc;border:1px solid #3f3f46;padding:.75rem;border-radius:.75rem}
+        .answer-button:hover:not(:disabled){background-color:#3f3f46;color:#fff}
+        .timer-bar-container-top{position:absolute;top:0;left:0;width:100%;height:4px;background:linear-gradient(to right,#4b5563,#3f3f46);overflow:hidden;border-top-left-radius:1rem;border-top-right-radius:1rem}
+        .timer-bar{height:100%;background:linear-gradient(to right,#22d3ee,#8b5cf6);width:100%}
+        .results-card{background:#171717;border:1px solid #2c2c2c;border-radius:2rem;padding:1rem}
+        .result-stat-box{background:rgba(40,40,40,.7);border:1px solid #3a3a3a;padding:.75rem;border-radius:.75rem}
+        /* Use a solid blue color for exported text to avoid gradient rendering issues */
+        .text-gradient-cyan-blue { color: #3b82f6 !important; -webkit-text-fill-color: #3b82f6 !important; background: none !important; }
+        .screenshot-wrapper-padded{padding:1rem;background-color:var(--bg-dark);border-radius:2.5rem}
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 3px solid rgba(139, 92, 246, 0.1); 
-            box-shadow: 0 0 50px rgba(59, 130, 246, 0.1);
-        }
-
-        #app-container {
-            width: 100%; 
-            max-width: 480px;
-            min-width: 320px;
-            background-color: var(--bg-dark); 
-        }
-
-        .title-glow {
-            text-shadow: 0 0 20px rgba(34, 211, 238, 0.6); 
-            background: linear-gradient(to right, var(--title-start), var(--title-end));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .bg-active-gradient {
-            background: linear-gradient(to bottom right, var(--gradient-start), var(--gradient-middle));
-            color: white; 
-            border: none;
-            font-weight: 800;
-            box-shadow: 0 0 15px rgba(34, 211, 238, 0.4); 
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .bg-active-gradient:hover {
-            opacity: 0.95;
-            transform: scale(1.02);
-            box-shadow: 0 0 20px rgba(34, 211, 238, 0.6);
-        }
-
-        .bg-inactive {
-            background-color: var(--card-dark);
-            color: var(--text-sub);
-            border: 1px solid #27272a; 
-            transition: all 0.2s ease;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); 
-        }
-        .bg-inactive:hover {
-            background-color: var(--card-hover);
-            color: white;
-            border-color: #52525b; 
-        }
-        .bg-inactive .text-sm {
-             color: #a1a1aa; 
-             opacity: 0.6;
-        }
-        
-        .input-field {
-            background-color: var(--card-dark);
-            border: 1px solid #27272a;
-            color: var(--text-main);
-            padding: 0.75rem 1rem;
-            border-radius: 0.75rem;
-            transition: border-color 0.2s;
-        }
-
-        .input-field:focus {
-            outline: none;
-            border-color: var(--gradient-start);
-            box-shadow: 0 0 5px rgba(34, 211, 238, 0.4); 
-        }
-
-        /* Styling for the new Quiz Screen layout */
-        .quiz-stat-box {
-            background-color: #1a1a1a;
-            border: 1px solid #333;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-            transition: background-color 0.2s;
-        }
-        
-        .answer-button {
-            background-color: #262626; /* Darker option background */
-            color: #ccc;
-            border: 1px solid #3f3f46; /* Border */
-            transition: all 0.2s ease;
-        }
-        .answer-button:hover:not(:disabled) {
-            background-color: #3f3f46;
-            color: #fff;
-            border-color: #71717a;
-        }
-
-        /* Timer Bar as a visual progress indicator */
-        .timer-bar-container-top {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(to right, #4b5563, #3f3f46); /* Dark base for the bar */
-            overflow: hidden;
-            border-top-left-radius: 1rem;
-            border-top-right-radius: 1rem;
-        }
-        
-        .timer-bar {
-            height: 100%;
-            /* Progress bar color gradient */
-            background: linear-gradient(to right, #22d3ee, #8b5cf6); 
-            /* Transition is set dynamically in JS to match question time */
-        }
-
-        /* Styles for the new Result Screen layout */
-        .results-card {
-            background-color: #171717;
-            border: 1px solid #2c2c2c;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-            /* Important for html2canvas to capture correctly */
-            transform: translateZ(0);
-            border-radius: 2rem; /* Adjusted for more curve */
-        }
-        .result-stat-box {
-            background-color: rgba(40, 40, 40, 0.7); /* Slightly lighter dark */
-            border: 1px solid #3a3a3a;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-        /* Changed gradient to blue and cyan blue */
-        .text-gradient-cyan-blue {
-            background: linear-gradient(to right, #0ea5e9, #22d3ee); /* Blue to Cyan */
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* Classes to manage padding/margin for screenshot */
-        .screenshot-container-padding {
-            padding: 0 !important;
-        }
-        .screenshot-wrapper-padded {
-            padding: 1rem; /* The 'gap' around the card */
-            background-color: var(--bg-dark); /* Ensure the gap color is consistent */
-            border-radius: 2.5rem; /* Larger radius for the wrapper to contain the card */
-            box-shadow: 0 0 0px 5px rgba(139, 92, 246, 0.1); /* Subtle outer border for visual interest */
-        }
-        
-        /* New style for selected difficulty on leaderboard filter */
-        .leaderboard-filter-btn {
-            background-color: #262626; 
-            color: #94a3b8; /* slate-400 */
-            border: 1px solid #3f3f46;
-            transition: all 0.2s;
-        }
-        .leaderboard-filter-btn.active {
-            background: linear-gradient(to right, #0ea5e9, #22d3ee); /* Blue to Cyan */
-            color: white;
-            font-weight: 700;
-            border-color: #22d3ee;
+        /* Responsive tweaks */
+        @media (min-width: 768px) {
+            #app-container { max-width: 800px; }
         }
     </style>
 </head>
-<body class="p-4">
+<body class="p-2 sm:p-4 md:p-8">
 
-    
-<div id="app-container" class="w-full max-w-md p-6 sm:p-8 rounded-2xl">
+<div id="app-container" class="w-full max-w-xl mx-auto p-4 sm:p-6 md:p-10 rounded-2xl">
+    <!-- SETTINGS SCREEN -->
+    <div id="quiz-settings-screen" class="flex flex-col items-center w-full">
+        <h1 class="text-4xl font-black mb-0 uppercase tracking-wider text-center flex justify-center items-center">
+            <span class="title-glow">BILLIONS</span>
+            <span class="title-glow ml-2">NETWORK</span>
+        </h1>
+        <p class="text-sm text-gray-400 mb-8 text-center tracking-wider">Identity & Verification Quiz</p>
 
-        
-<div id="quiz-settings-screen" class="flex flex-col items-center w-full">
-            
-            <h1 class="text-4xl font-black mb-0 uppercase tracking-wider text-center flex justify-center items-center">
-                <span class="title-glow">BILLIONS</span>
-                <span class="title-glow ml-2">NETWORK</span>
-            </h1>
-            <p class="text-sm text-gray-400 mb-8 text-center tracking-wider">Identity & Verification Quiz</p>
-            
-            
-<div class="w-full mb-8">
-                <label for="user-name-input" class="block text-sm font-bold text-gray-400 uppercase tracking-widest mb-2 text-center">Your Name</label>
-                <input type="text" id="user-name-input" placeholder="e.g., Jane Doe" class="w-full input-field text-center">
-            </div>
-
-            
-<div class="w-full mb-8">
-                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">DIFFICULTY LEVEL (Q Count & Time)</h3>
-                <div class="grid grid-cols-3 gap-3">
-                    
-<button onclick="selectDifficulty('easy')" id="btn-diff-easy" class="diff-btn relative rounded-xl p-3 flex flex-col items-center justify-center transition-all duration-200 bg-inactive h-24">
-                        <span class="text-base font-bold mb-1">Easy (6Q)</span>
-                        <span class="time-display text-[10px] opacity-60 leading-tight text-center">12 seconds<br>per question</span>
-                    </button>
-                    
-<button onclick="selectDifficulty('medium')" id="btn-diff-medium" class="diff-btn relative rounded-xl p-3 flex flex-col items-center justify-center transition-all duration-200 bg-inactive h-24">
-                        <span class="text-base font-bold mb-1">Medium (6Q)</span>
-                        <span class="time-display text-[10px] opacity: 0.60; leading-tight text-center">8 seconds<br>per question</span>
-                    </button>
-                    
-<button onclick="selectDifficulty('hard')" id="btn-diff-hard" class="diff-btn relative rounded-xl p-3 flex flex-col items-center justify-center transition-all duration-200 bg-inactive h-24">
-                        <span class="text-base font-bold mb-1">Hard (8Q)</span>
-                        <span class="time-display text-[10px] opacity-60 leading-tight text-center">4 seconds<br>per question</span>
-                    </button>
-                </div>
-            </div>
-
-            
-<button onclick="startGame()" class="w-full sm:w-1/2 py-4 rounded-xl font-bold text-lg bg-active-gradient text-[#0a0a0a] shadow-[0_0_20px_rgba(34,211,238,0.5)] hover:scale-[1.03] transition-transform duration-200 mb-6">
-                Begin Quiz
-            </button>
-
-            <p id="error-msg" class="text-red-500 text-xs mt-0 mb-4 h-4"></p>
-
-            
-<div class="w-full">
-                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3 text-center border-t pt-4 border-zinc-800">GLOBAL LEADERBOARD (<span id="leaderboard-title-diff">Easy</span>)</h3>
-                
-                <div class="flex justify-center gap-2 mb-4">
-                    <button class="leaderboard-filter-btn rounded-full px-4 py-1 text-xs" data-filter="easy" onclick="filterLeaderboard('easy')">Easy</button>
-                    <button class="leaderboard-filter-btn rounded-full px-4 py-1 text-xs" data-filter="medium" onclick="filterLeaderboard('medium')">Medium</button>
-                    <button class="leaderboard-filter-btn rounded-full px-4 py-1 text-xs" data-filter="hard" onclick="filterLeaderboard('hard')">Hard</button>
-                </div>
-
-                <div id="leaderboard-container" class="w-full bg-[#121212] p-4 rounded-xl shadow-inner border border-zinc-800">
-                    <p id="leaderboard-status" class="text-center text-sm text-gray-500">Loading scores...</p>
-                    <ul id="leaderboard-list" class="space-y-2">
-                        
-</ul>
-                </div>
-            </div>
-
+        <div class="w-full mb-8">
+            <label for="user-name-input" class="block text-sm font-bold text-gray-400 uppercase tracking-widest mb-2 text-center">Your Name</label>
+            <input type="text" id="user-name-input" placeholder="e.g., Jane Doe" class="w-full input-field text-center">
         </div>
 
-
-        
-<div id="quiz-content" class="hidden flex-col w-full bg-[#171717] p-6 rounded-2xl border border-zinc-800 shadow-2xl relative overflow-hidden">
-            
-            
-<div class="timer-bar-container-top">
-                <div id="timer-bar" class="timer-bar w-full"></div>
-            </div>
-            
-            
-<div class="text-center text-sm font-bold text-gray-300 uppercase tracking-widest mt-4 mb-4" id="player-name-display">
-                PLAYER
-            </div>
-
-            <div class="grid grid-cols-3 gap-3 mb-6">
-                
-<div class="quiz-stat-box rounded-lg p-2 text-center">
-                    <div class="text-sm font-semibold text-gray-400 leading-none">Score:</div>
-                    <div class="text-lg font-bold text-white leading-tight" id="score-display">0</div>
-                </div>
-                
-                
-<div class="quiz-stat-box rounded-lg p-2 text-center">
-                    <div class="text-sm font-semibold text-gray-400 leading-none">Time Remaining:</div>
-                    <div class="text-lg font-bold text-white leading-tight" id="time-remaining-display">12s</div>
-                </div>
-
-                
-<div class="quiz-stat-box rounded-lg p-2 text-center">
-                    <div class="text-sm font-semibold text-gray-400 leading-none">Progress:</div>
-                    <div class="text-lg font-bold text-white leading-tight" id="progress-display">1/6</div>
-                </div>
-            </div>
-
-            
-<div class="mb-8 p-4 rounded-xl bg-zinc-800/50">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 text-center" id="category-display-header">Question <span id="current-q-num">1</span>/<span id="total-q-count">6</span></p>
-                <h2 class="text-xl font-bold leading-relaxed text-white text-center" id="question-text">Question text...</h2>
-            </div>
-
-            
-<div id="choices-container" class="space-y-3">
-                
-</div>
-
-            
-<div id="feedback-message" class="mt-4 text-center text-sm font-bold h-6 text-yellow-300"></div>
-        </div>
-
-
-        
-<div id="results-screen" class="hidden flex-col w-full items-center text-center">
-            <h2 class="text-3xl font-black title-glow mb-1">Quiz Complete</h2>
-            <p class="text-xl font-bold text-gray-300 mb-6" id="player-name-result">PLAYER</p>
-
-            
-<div id="screenshot-wrapper" class="hidden flex-col items-center justify-center w-full mb-8">
-                <div id="results-card" class="w-full results-card p-6 sm:p-8 relative overflow-hidden">
-                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-500/20 blur-3xl rounded-full"></div>
-                    
-                    <h3 class="text-2xl font-black uppercase tracking-wider text-center text-gradient-cyan-blue mb-4 relative z-10">
-                        BILLIONS QUIZ RESULTS
-                    </h3>
-                    
-                    <p class="text-lg font-bold text-white mb-2 relative z-10" id="player-name-result-card">PLAYER</p>
-                    <p class="text-sm text-gray-400 uppercase tracking-wider mb-6 relative z-10" id="level-q-count-result">
-                        EASY LEVEL • 6 QUESTIONS
-                    </p>
-
-                    <p class="text-6xl font-black text-gradient-cyan-blue mb-2 relative z-10" id="final-percentage">0%</p>
-                    <p class="text-xl font-extrabold text-white uppercase tracking-wider mb-8 relative z-10" id="intuition-iq-message">NOVICE</p>
-                    
-                    <div class="grid grid-cols-3 gap-4 mb-8">
-                        
-<div class="result-stat-box rounded-lg p-3 text-center">
-                            <div class="text-2xl font-bold text-white" id="result-total-questions">6</div>
-                            <div class="text-xs font-semibold text-gray-400 uppercase mt-1">QUESTIONS</div>
-                        </div>
-                        
-<div class="result-stat-box rounded-lg p-3 text-center">
-                            <div class="text-2xl font-bold text-white" id="result-time-per-q">12s</div>
-                            <div class="text-xs font-semibold text-gray-400 uppercase mt-1">TIME PER Q</div>
-                        </div>
-                        
-<div class="result-stat-box rounded-lg p-3 text-center">
-                            <div class="text-2xl font-bold text-white" id="result-max-streak">2</div>
-                            <div class="text-xs font-semibold text-gray-400 uppercase mt-1">MAX STREAK</div>
-                        </div>
-                    </div>
-
-                    <p class="text-sm text-gray-300 leading-relaxed mb-6 relative z-10" id="result-message">
-                        Your knowledge base needs to be solidified. Review the core concepts and try again!
-                    </p>
-
-                    <div class="text-xs text-gray-500 mb-2 relative z-10">Billions Quiz</div>
-                    <div class="text-xs text-gray-500 relative z-10" id="result-date">November 27, 2025</div>
-                </div>
-            </div>
-
-            <div class="w-full grid grid-cols-2 gap-3 mb-3 mt-8">
-                <button onclick="showScreen('quiz-settings-screen')" class="w-full py-3 rounded-xl font-bold text-md bg-zinc-700 text-white hover:bg-zinc-600 transition-colors">
-                    Try Again
+        <div class="w-full mb-8">
+            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">DIFFICULTY LEVEL (Q Count & Time)</h3>
+            <div class="grid grid-cols-3 gap-3 w-full">
+                <button onclick="selectDifficulty('easy')" id="btn-diff-easy" class="diff-btn relative rounded-xl p-3 flex flex-col items-center justify-center transition-all duration-200 bg-inactive h-24">
+                    <span class="text-base font-bold mb-1">Easy (6Q)</span>
+                    <span class="time-display text-[10px] opacity-60 leading-tight text-center">12s per question</span>
                 </button>
-                <button onclick="downloadResults()" class="w-full py-3 rounded-xl font-bold text-md bg-gradient-to-r from-green-400 to-emerald-600 text-[#0a0a0a] hover:opacity-90 transition-opacity">
-                    Download Results
+                <button onclick="selectDifficulty('medium')" id="btn-diff-medium" class="diff-btn relative rounded-xl p-3 flex flex-col items-center justify-center transition-all duration-200 bg-inactive h-24">
+                    <span class="text-base font-bold mb-1">Medium (6Q)</span>
+                    <span class="time-display text-[10px] opacity-60 leading-tight text-center">8s per question</span>
                 </button>
-            </div>
-            <div class="w-full grid grid-cols-2 gap-3 mb-6">
-                <button onclick="shareOnX()" class="w-full py-3 rounded-xl font-bold text-md bg-blue-500 text-white hover:bg-blue-400 transition-colors">
-                    Share on X
-                </button>
-                <button onclick="showScreen('quiz-settings-screen')" class="w-full py-3 rounded-xl font-bold text-md bg-gradient-to-r from-cyan-400 to-blue-600 text-white hover:opacity-90 transition-opacity">
-                    View Leaderboard
+                <button onclick="selectDifficulty('hard')" id="btn-diff-hard" class="diff-btn relative rounded-xl p-3 flex flex-col items-center justify-center transition-all duration-200 bg-inactive h-24">
+                    <span class="text-base font-bold mb-1">Hard (8Q)</span>
+                    <span class="time-display text-[10px] opacity-60 leading-tight text-center">4s per question</span>
                 </button>
             </div>
         </div>
+
+        <button onclick="startGame()" class="w-full sm:w-1/2 py-4 rounded-xl font-bold text-lg bg-active-gradient text-[#0a0a0a] shadow-[0_0_20px_rgba(34,211,238,0.5)] hover:scale-[1.03] transition-transform duration-200 mb-6">
+            Begin Quiz
+        </button>
+
+        <p id="error-msg" class="text-red-500 text-xs mt-0 mb-4 h-4"></p>
+
+        <!-- Leaderboard UI intentionally removed -->
     </div>
 
-    
-<script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, onSnapshot, collection, query, where, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // setLogLevel('Debug'); // Uncomment to debug Firebase
+    <!-- QUIZ CONTENT -->
+    <div id="quiz-content" class="hidden flex-col w-full bg-[#171717] p-6 rounded-2xl border border-zinc-800 shadow-2xl relative overflow-hidden">
+        <div class="timer-bar-container-top"><div id="timer-bar" class="timer-bar w-full"></div></div>
 
-        // --- GLOBAL FUNCTION EXPORTS (Required for onclick in HTML) ---
-        window.selectDifficulty = selectDifficulty;
-        window.startGame = startGame;
-        window.handleAnswer = handleAnswer; // Exposed for answer buttons
-        window.showScreen = showScreen;
-        window.downloadResults = downloadResults; 
-        window.shareOnX = shareOnX; 
-        window.filterLeaderboard = filterLeaderboard; // New function for filtering
+        <div class="text-center text-sm font-bold text-gray-300 uppercase tracking-widest mt-4 mb-4" id="player-name-display">PLAYER</div>
 
-        // --- QUIZ DATA (Structured by Difficulty) ---
-        const QUIZ_DATA_BY_DIFFICULTY = {
-            easy: [
-                {
-                    question: "What is the main goal of Billions Network?",
-                    answerOptions: [
-                        { text: "To create a single global social network", isCorrect: false },
-                        { text: "To verify identities and prevent fake accounts", isCorrect: true },
-                        { text: "To provide cryptocurrency trading", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "Which of the following can Billions Network verify?",
-                    answerOptions: [
-                        { text: "Only humans", isCorrect: false },
-                        { text: "Humans and AI agents", isCorrect: true },
-                        { text: "Only businesses", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "What information is required for human verification on Billions Network?",
-                    answerOptions: [
-                        { text: "A valid ID and device", isCorrect: true },
-                        { text: "Only a social media account", isCorrect: false },
-                        { text: "A signed notarized letter", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "Does Billions Network sell your personal data to advertisers?",
-                    answerOptions: [
-                        { text: "Yes", isCorrect: false },
-                        { text: "No", isCorrect: true },
-                        { text: "Only for premium users", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "How long does verification usually take on Billions Network?",
-                    answerOptions: [
-                        { text: "A few minutes", isCorrect: true },
-                        { text: "Several days", isCorrect: false },
-                        { text: "Weeks", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "Can someone else verify an identity on your behalf?",
-                    answerOptions: [
-                        { text: "No", isCorrect: true },
-                        { text: "Yes", isCorrect: false },
-                        { text: "Only a family member", isCorrect: false }
-                    ]
-                },
-            ],
-            medium: [
-                {
-                    question: "How does Billions Network maintain privacy during verification?",
-                    answerOptions: [
-                        { text: "Encrypts data and does not store raw personal information", isCorrect: true },
-                        { text: "Stores all data on a centralized server", isCorrect: false },
-                        { text: "Shares your data with partner apps", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "What problem does the “proof of uniqueness” solve?",
-                    answerOptions: [
-                        { text: "Prevents duplicate or fake identities", isCorrect: true },
-                        { text: "Confirms your favorite apps", isCorrect: false },
-                        { text: "Ensures your device is updated", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "Why might apps and services want users verified by Billions Network?",
-                    answerOptions: [
-                        { text: "To reduce fake users and improve trust", isCorrect: true },
-                        { text: "To access private emails", isCorrect: false },
-                        { text: "To automatically give discounts", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "Once verified, can your Billions identity be reused across different platforms?",
-                    answerOptions: [
-                        { text: "Yes", isCorrect: true },
-                        { text: "No", isCorrect: false },
-                        { text: "Only within the same country", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "How is Billions Network different from social media verification?",
-                    answerOptions: [
-                        { text: "It uses cryptography and privacy-first verification", isCorrect: true },
-                        { text: "It posts your ID publicly", isCorrect: false },
-                        { text: "It only works with celebrity accounts", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "What is one real-world impact of Billions Network verification?",
-                    answerOptions: [
-                        { text: "Reduces duplicate accounts and fraud", isCorrect: true },
-                        { text: "Automatically increases your credit score", isCorrect: false },
-                        { text: "Changes your social media ranking", isCorrect: false }
-                    ]
-                },
-            ],
-            hard: [
-                {
-                    question: "Who are the founders of Billions Network?",
-                    answerOptions: [
-                        { text: "Evan McMillan and David Shwartz", isCorrect: false },
-                        { text: "Evein McMullen and David Schwartz", isCorrect: true },
-                        { text: "Evan McMullen and Daniel Schwartz", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "What is a key feature that allows Billions to resist fake AI-generated accounts?",
-                    answerOptions: [
-                        { text: "Liveness detection and ID checks", isCorrect: true },
-                        { text: "Tracking IP addresses", isCorrect: false },
-                        
-                        { text: "Requiring a social media login", isCorrect: false } 
-                    ]
-                },
-                {
-                    question: "What is one potential benefit of Billions Network for AI agents?",
-                    answerOptions: [
-                        { text: "Allows AI to have verified digital identities", isCorrect: true },
-                        { text: "Gives AI access to users’ private emails", isCorrect: false },
-                        { text: "Lets AI post on social media automatically", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "How does Billions Network ensure you remain in control of your data?",
-                    answerOptions: [
-                        { text: "By giving users cryptographic proofs instead of raw data", isCorrect: true },
-                        { text: "By sending all data to a central authority", isCorrect: false },
-                        { text: "By publishing your identity on a public ledger", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "Which of the following BEST describes Billions Network’s approach?",
-                    answerOptions: [
-                        { text: "Privacy-first, decentralized verification", isCorrect: true },
-                        { text: "Centralized data storage", isCorrect: false },
-                        { text: "A simple login system for apps", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "Why is “proof of uniqueness” important for preventing Sybil attacks?",
-                    answerOptions: [
-                        { text: "It ensures one person can only create one verified identity", isCorrect: true },
-                        { text: "It blocks social media apps", isCorrect: false },
-                        { text: "It checks your device model", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "What is the main purpose of the $BILL token in Billions Network?",
-                    answerOptions: [
-                        { text: "To serve as a verification, staking, governance, and ecosystem reward token", isCorrect: true },
-                        { text: "To act only as a social media reward", isCorrect: false },
-                        { text: "To pay for streaming services", isCorrect: false }
-                    ]
-                },
-                {
-                    question: "If Billions becomes widely adopted, what is a potential societal effect?",
-                    answerOptions: [
-                        { text: "Safer and more trusted online interactions", isCorrect: true },
-                        { text: "All websites become free", isCorrect: false },
-                        { text: "Social media accounts become anonymous by default", isCorrect: false }
-                    ]
-                },
-            ]
-        };
+        <div class="grid grid-cols-3 gap-3 mb-6">
+            <div class="quiz-stat-box rounded-lg p-2 text-center">
+                <div class="text-sm font-semibold text-gray-400 leading-none">Score:</div>
+                <div class="text-lg font-bold text-white leading-tight" id="score-display">0</div>
+            </div>
+            <div class="quiz-stat-box rounded-lg p-2 text-center">
+                <div class="text-sm font-semibold text-gray-400 leading-none">Time Remaining:</div>
+                <div class="text-lg font-bold text-white leading-tight" id="time-remaining-display">12s</div>
+            </div>
+            <div class="quiz-stat-box rounded-lg p-2 text-center">
+                <div class="text-sm font-semibold text-gray-400 leading-none">Progress:</div>
+                <div class="text-lg font-bold text-white leading-tight" id="progress-display">1/6</div>
+            </div>
+        </div>
 
-        // --- FIREBASE SETUP ---
-        // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        <div class="mb-8 p-4 rounded-xl bg-zinc-800/50">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 text-center" id="category-display-header">Question <span id="current-q-num">1</span>/<span id="total-q-count">6</span></p>
+            <h2 class="text-xl font-bold leading-relaxed text-white text-center" id="question-text">Question text...</h2>
+        </div>
 
-        let db, auth, userId = null;
-        let isAuthReady = false;
-        
-        // Define the Firestore collection path for the public leaderboard
-        const LEADERBOARD_COLLECTION_PATH = `artifacts/${appId}/public/data/leaderboard`;
-        
-        // State for Leaderboard Filtering (New)
-        let currentLeaderboardFilter = 'easy'; // Default filter
-        const LEADERBOARD_LIMIT = 100; // New limit
+        <div id="choices-container" class="space-y-3"></div>
+        <div id="feedback-message" class="mt-4 text-center text-sm font-bold h-6 text-yellow-300"></div>
+    </div>
 
-        async function initFirebase() {
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                
-                // Authentication
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                // Auth State Listener
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        isAuthReady = true;
-                        console.log("Firebase Auth Ready. User ID:", userId);
-                        // Start loading the default (easy) leaderboard
-                        filterLeaderboard(currentLeaderboardFilter); 
-                    } else {
-                        // User might be signed in anonymously if token was null
-                        userId = auth.currentUser?.uid || crypto.randomUUID();
-                        isAuthReady = true; 
-                        console.log("Firebase Auth Ready (User ID determined).");
-                        filterLeaderboard(currentLeaderboardFilter);
-                    }
-                });
+    <!-- RESULTS SCREEN -->
+    <div id="results-screen" class="hidden flex-col w-full items-center text-center">
+        <h2 class="text-3xl font-black title-glow mb-1">Quiz Complete</h2>
+        <p class="text-xl font-bold text-gray-300 mb-6" id="player-name-result">PLAYER</p>
 
-            } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                document.getElementById('leaderboard-status').textContent = "Error loading leaderboard.";
+        <div id="screenshot-wrapper" class="hidden flex-col items-center justify-center w-full mb-8">
+            <div id="results-card" class="w-full results-card p-6 sm:p-8 relative overflow-hidden">
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-500/20 blur-3xl rounded-full"></div>
+                <h3 class="text-2xl font-black uppercase tracking-wider text-center text-gradient-cyan-blue mb-4 relative z-10">BILLIONS QUIZ RESULTS</h3>
+                <p class="text-lg font-bold text-white mb-2 relative z-10" id="player-name-result-card">PLAYER</p>
+                <p class="text-sm text-gray-400 uppercase tracking-wider mb-6 relative z-10" id="level-q-count-result">EASY LEVEL • 6 QUESTIONS</p>
+                <p class="text-6xl font-black text-gradient-cyan-blue mb-2 relative z-10" id="final-percentage">0%</p>
+                <p class="text-xl font-extrabold text-white uppercase tracking-wider mb-8 relative z-10" id="intuition-iq-message">NOVICE</p>
+
+                <div class="grid grid-cols-3 gap-4 mb-8">
+                    <div class="result-stat-box rounded-lg p-3 text-center"><div class="text-2xl font-bold text-white" id="result-total-questions">6</div><div class="text-xs font-semibold text-gray-400 uppercase mt-1">QUESTIONS</div></div>
+                    <div class="result-stat-box rounded-lg p-3 text-center"><div class="text-2xl font-bold text-white" id="result-time-per-q">12s</div><div class="text-xs font-semibold text-gray-400 uppercase mt-1">TIME PER Q</div></div>
+                    <div class="result-stat-box rounded-lg p-3 text-center"><div class="text-2xl font-bold text-white" id="result-max-streak">2</div><div class="text-xs font-semibold text-gray-400 uppercase mt-1">MAX STREAK</div></div>
+                </div>
+
+                <p class="text-sm text-gray-300 leading-relaxed mb-6 relative z-10" id="result-message">Your knowledge base needs to be solidified. Review the core concepts and try again!</p>
+                <div class="text-xs text-gray-500 mb-2 relative z-10">Billions Quiz</div>
+                <div class="text-xs text-gray-500 relative z-10" id="result-date">November 27, 2025</div>
+            </div>
+        </div>
+
+        <!-- Updated button layout: Share on X first, Try Again full-width, Download Results full-width -->
+        <div class="w-full flex flex-col gap-3 mb-6 mt-8">
+            <button id="btn-share" class="w-full py-3 active:scale-95 transition-transform rounded-xl font-bold text-md bg-blue-500 text-white hover:bg-blue-400 transition-colors">Share on X</button>
+            <button id="btn-try" class="w-full py-3 rounded-xl font-bold text-md bg-zinc-700 text-white hover:bg-zinc-600 transition-colors">Try Again</button>
+            <button id="btn-download" class="w-full py-3 active:scale-95 transition-transform rounded-xl font-bold text-md bg-gradient-to-r from-green-400 to-emerald-600 text-[#0a0a0a] hover:opacity-90 transition-opacity">Download Results</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Quiz data
+    const QUIZ_DATA_BY_DIFFICULTY = {
+        easy: [
+            {question:"What is the main goal of Billions Network?",answerOptions:[{text:"To create a single global social network",isCorrect:false},{text:"To verify identities and prevent fake accounts",isCorrect:true},{text:"To provide cryptocurrency trading",isCorrect:false}]},
+            {question:"Which of the following can Billions Network verify?",answerOptions:[{text:"Only humans",isCorrect:false},{text:"Humans and AI agents",isCorrect:true},{text:"Only businesses",isCorrect:false}]},
+            {question:"What information is required for human verification on Billions Network?",answerOptions:[{text:"A valid ID and device",isCorrect:true},{text:"Only a social media account",isCorrect:false},{text:"A signed notarized letter",isCorrect:false}]},
+            {question:"Does Billions Network sell your personal data to advertisers?",answerOptions:[{text:"Yes",isCorrect:false},{text:"No",isCorrect:true},{text:"Only for premium users",isCorrect:false}]},
+            {question:"How long does verification usually take on Billions Network?",answerOptions:[{text:"A few minutes",isCorrect:true},{text:"Several days",isCorrect:false},{text:"Weeks",isCorrect:false}]},
+            {question:"Can someone else verify an identity on your behalf?",answerOptions:[{text:"No",isCorrect:true},{text:"Yes",isCorrect:false},{text:"Only a family member",isCorrect:false}]}],
+        medium:[
+            {question:"How does Billions Network maintain privacy during verification?",answerOptions:[{text:"Encrypts data and does not store raw personal information",isCorrect:true},{text:"Stores all data on a centralized server",isCorrect:false},{text:"Shares your data with partner apps",isCorrect:false}]},
+            {question:"What problem does the “proof of uniqueness” solve?",answerOptions:[{text:"Prevents duplicate or fake identities",isCorrect:true},{text:"Confirms your favorite apps",isCorrect:false},{text:"Ensures your device is updated",isCorrect:false}]},
+            {question:"Why might apps and services want users verified by Billions Network?",answerOptions:[{text:"To reduce fake users and improve trust",isCorrect:true},{text:"To access private emails",isCorrect:false},{text:"To automatically give discounts",isCorrect:false}]},
+            {question:"Once verified, can your Billions identity be reused across different platforms?",answerOptions:[{text:"Yes",isCorrect:true},{text:"No",isCorrect:false},{text:"Only within the same country",isCorrect:false}]},
+            {question:"How is Billions Network different from social media verification?",answerOptions:[{text:"It uses cryptography and privacy-first verification",isCorrect:true},{text:"It posts your ID publicly",isCorrect:false},{text:"It only works with celebrity accounts",isCorrect:false}]},
+            {question:"What is one real-world impact of Billions Network verification?",answerOptions:[{text:"Reduces duplicate accounts and fraud",isCorrect:true},{text:"Automatically increases your credit score",isCorrect:false},{text:"Changes your social media ranking",isCorrect:false}]}],
+        hard:[
+            {question:"Who are the founders of Billions Network?",answerOptions:[{text:"Evan McMillan and David Shwartz",isCorrect:false},{text:"Evein McMullen and David Schwartz",isCorrect:true},{text:"Evan McMullen and Daniel Schwartz",isCorrect:false}]},
+            {question:"What is a key feature that allows Billions to resist fake AI-generated accounts?",answerOptions:[{text:"Liveness detection and ID checks",isCorrect:true},{text:"Tracking IP addresses",isCorrect:false},{text:"Requiring a social media login",isCorrect:false}]},
+            {question:"What is one potential benefit of Billions Network for AI agents?",answerOptions:[{text:"Allows AI to have verified digital identities",isCorrect:true},{text:"Gives AI access to users’ private emails",isCorrect:false},{text:"Lets AI post on social media automatically",isCorrect:false}]},
+            {question:"How does Billions Network ensure you remain in control of your data?",answerOptions:[{text:"By giving users cryptographic proofs instead of raw data",isCorrect:true},{text:"By sending all data to a central authority",isCorrect:false},{text:"By publishing your identity on a public ledger",isCorrect:false}]},
+            {question:"Which of the following BEST describes Billions Network’s approach?",answerOptions:[{text:"Privacy-first, decentralized verification",isCorrect:true},{text:"Centralized data storage",isCorrect:false},{text:"A simple login system for apps",isCorrect:false}]},
+            {question:"Why is “proof of uniqueness” important for preventing Sybil attacks?",answerOptions:[{text:"It ensures one person can only create one verified identity",isCorrect:true},{text:"It blocks social media apps",isCorrect:false},{text:"It checks your device model",isCorrect:false}]},
+            {question:"What is the main purpose of the $BILL token in Billions Network?",answerOptions:[{text:"To serve as a verification, staking, governance, and ecosystem reward token",isCorrect:true},{text:"To act only as a social media reward",isCorrect:false},{text:"To pay for streaming services",isCorrect:false}]},
+            {question:"If Billions becomes widely adopted, what is a potential societal effect?",answerOptions:[{text:"Safer and more trusted online interactions",isCorrect:true},{text:"All websites become free",isCorrect:false},{text:"Social media accounts become anonymous by default",isCorrect:false}]}]
+    };
+
+    // State
+    const difficultyLevels = {easy:{count:6,time:12,name:"Easy"},medium:{count:6,time:8,name:"Medium"},hard:{count:8,time:4,name:"Hard"}};
+    let quizSettings = {name:'',difficulty:'easy',questionCount:6,timePerQuestion:12};
+    let quizState = {};
+
+    // -- Utility functions --
+    function shuffleArray(array){for(let i=array.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[array[i],array[j]]=[array[j],array[i]]}return array}
+
+    // Define functions that are used by UI
+    function selectDifficulty(level){
+        document.querySelectorAll('.diff-btn').forEach(btn=>{btn.classList.remove('bg-active-gradient');btn.classList.add('bg-inactive')});
+        const selectedBtn=document.getElementById(`btn-diff-${level}`);
+        if(selectedBtn){selectedBtn.classList.remove('bg-inactive');selectedBtn.classList.add('bg-active-gradient')}
+        quizSettings.difficulty=level;quizSettings.questionCount=difficultyLevels[level].count;quizSettings.timePerQuestion=difficultyLevels[level].time;
+        const totalQEl=document.getElementById('total-q-count'); if(totalQEl) totalQEl.textContent = quizSettings.questionCount;
+        const timeEl=document.getElementById('time-remaining-display'); if(timeEl) timeEl.textContent = `${quizSettings.timePerQuestion}s`;
+        document.getElementById('error-msg').textContent='';
+    }
+
+    function showScreen(screenId){['quiz-settings-screen','quiz-content','results-screen'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.add('hidden');el.classList.remove('flex')}});const screen=document.getElementById(screenId);if(screen){screen.classList.remove('hidden');screen.classList.add('flex')}}
+
+    function startGame(){
+        quizSettings.name=document.getElementById('user-name-input').value.trim();
+        if(!quizSettings.name){document.getElementById('error-msg').textContent='Please enter your name to begin.';return}
+        if(!quizSettings.difficulty){document.getElementById('error-msg').textContent='Please select a difficulty level.';return}
+
+        quizState={currentQuestionIndex:0,score:0,correctAnswers:0,incorrectAnswers:0,timeRemaining:quizSettings.timePerQuestion,timerInterval:null,questions:[],currentStreak:0,maxStreak:0,totalTimeTaken:0,startTime:Date.now()}
+
+        const selectedQuestions = QUIZ_DATA_BY_DIFFICULTY[quizSettings.difficulty]||[];
+        quizState.questions = shuffleArray([...selectedQuestions]).slice(0,quizSettings.questionCount);
+
+        document.getElementById('player-name-display').textContent=quizSettings.name.toUpperCase();
+        document.getElementById('score-display').textContent=quizState.score;
+        document.getElementById('progress-display').textContent=`1/${quizSettings.questionCount}`;
+        document.getElementById('time-remaining-display').textContent=`${quizSettings.timePerQuestion}s`;
+
+        showScreen('quiz-content');renderQuestion();
+    }
+
+    function renderQuestion(){
+        if(quizState.currentQuestionIndex>=quizState.questions.length){endGame();return}
+        const q=quizState.questions[quizState.currentQuestionIndex];
+        document.getElementById('current-q-num').textContent=quizState.currentQuestionIndex+1;
+        document.getElementById('progress-display').textContent=`${quizState.currentQuestionIndex+1}/${quizSettings.questionCount}`;
+        document.getElementById('question-text').textContent=q.question;document.getElementById('feedback-message').textContent='';
+
+        const choicesContainer=document.getElementById('choices-container');choicesContainer.innerHTML='';
+        const shuffledOptions=shuffleArray([...q.answerOptions]);
+        shuffledOptions.forEach(option=>{const btn=document.createElement('button');btn.className='answer-button w-full text-left p-3 rounded-xl font-medium shadow-md transition-all duration-200';btn.setAttribute('data-option-text',option.text);btn.textContent=option.text;btn.onclick=()=>handleAnswer(option,btn);choicesContainer.appendChild(btn);});
+
+        clearInterval(quizState.timerInterval);quizState.timeRemaining=quizSettings.timePerQuestion;startTimer();updateTimerBar(quizSettings.timePerQuestion);
+    }
+
+    function startTimer(){
+        const timeDisplay=document.getElementById('time-remaining-display');
+        quizState.timerInterval=setInterval(()=>{quizState.timeRemaining-=1; if(timeDisplay) timeDisplay.textContent=`${quizState.timeRemaining}s`;updateTimerBar(quizState.timeRemaining); if(quizState.timeRemaining<=0){clearInterval(quizState.timerInterval);handleAnswer({isCorrect:false},null,true)} },1000);
+    }
+
+    function updateTimerBar(remaining){const timerBar=document.getElementById('timer-bar');const total=quizSettings.timePerQuestion;const pct=(remaining/total)*100; if(timerBar){timerBar.style.transition='width 1s linear';timerBar.style.width=`${pct}%`}}
+
+    function disableAllChoices(){document.querySelectorAll('.answer-button').forEach(btn=>{btn.disabled=true;btn.onclick=null})}
+
+    function handleAnswer(selectedOption,clickedButton,isTimeout=false){
+        clearInterval(quizState.timerInterval);disableAllChoices();
+        const feedbackMessage=document.getElementById('feedback-message');
+        const questionTimeTaken=quizSettings.timePerQuestion-quizState.timeRemaining;quizState.totalTimeTaken+=questionTimeTaken;
+
+        if(selectedOption.isCorrect){quizState.score+=1;quizState.correctAnswers+=1;quizState.currentStreak+=1;feedbackMessage.textContent='Correct!';feedbackMessage.className='mt-4 text-center text-sm font-bold h-6 text-green-400'; if(clickedButton){clickedButton.classList.add('bg-green-600','text-white')}}
+        else {quizState.incorrectAnswers+=1;quizState.maxStreak=Math.max(quizState.maxStreak,quizState.currentStreak);quizState.currentStreak=0;feedbackMessage.textContent=isTimeout? 'Time Out! Incorrect.':'Incorrect.';feedbackMessage.className='mt-4 text-center text-sm font-bold h-6 text-red-400'; if(clickedButton){clickedButton.classList.add('bg-red-600','text-white')} const q=quizState.questions[quizState.currentQuestionIndex]; const correctOpt=q.answerOptions.find(o=>o.isCorrect); const correctBtn=Array.from(document.querySelectorAll('#choices-container button')).find(b=>b.getAttribute('data-option-text')===correctOpt.text); if(correctBtn) correctBtn.classList.add('border-2','border-green-400');}
+
+        document.getElementById('score-display').textContent=quizState.score;quizState.maxStreak=Math.max(quizState.maxStreak,quizState.currentStreak);
+        setTimeout(()=>{quizState.currentQuestionIndex+=1;if(quizState.currentQuestionIndex<quizState.questions.length)renderQuestion();else endGame()},1500);
+    }
+
+    function endGame(){
+        clearInterval(quizState.timerInterval);
+        const totalQuestions=quizSettings.questionCount;
+        const finalScorePercentage=totalQuestions>0?Math.round((quizState.correctAnswers/totalQuestions)*100):0;
+        const avgTimePerQ=totalQuestions>0?(quizState.totalTimeTaken/totalQuestions).toFixed(1):0;
+        let iqMessage,resultText;
+        if(finalScorePercentage>=80){iqMessage='MASTER BILLIONS KNOWLEDGE';resultText='Exceptional mastery of the Billions Network Identity concepts. You\'ve earned your place in the Trust Layer!'}
+        else if(finalScorePercentage>=60){iqMessage='HIGH KNOWLEDGE LEVEL';resultText='Strong comprehension of the core Identity and Verification concepts. You understand Proof of Uniqueness well.'}
+        else if(finalScorePercentage>=40){iqMessage='DEVELOPING KNOWLEDGE';resultText='Start paying closer attention to the key principles of the Identity and Verification mechanisms. Review the documentation!'}
+        else {iqMessage='NOVICE LEVEL';resultText='Your knowledge base needs to be solidified. Review the core concepts and try again!'}
+
+        document.getElementById('player-name-result').textContent=quizSettings.name;document.getElementById('player-name-result-card').textContent=quizSettings.name;document.getElementById('level-q-count-result').textContent=`${quizSettings.difficulty.toUpperCase()} LEVEL • ${totalQuestions} QUESTIONS`;
+        document.getElementById('final-percentage').textContent=`${finalScorePercentage}%`;document.getElementById('intuition-iq-message').textContent=iqMessage;document.getElementById('result-total-questions').textContent=totalQuestions;document.getElementById('result-time-per-q').textContent=`${avgTimePerQ}s`;document.getElementById('result-max-streak').textContent=quizState.maxStreak;document.getElementById('result-message').textContent=resultText;document.getElementById('result-date').textContent=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+
+        const screenshotWrapper=document.getElementById('screenshot-wrapper'); if(screenshotWrapper){screenshotWrapper.classList.remove('hidden');screenshotWrapper.classList.add('flex')}
+
+        // Save score stub
+        saveScore({name:quizSettings.name,score:finalScorePercentage,difficulty:quizSettings.difficulty,avgTimePerQ:parseFloat(avgTimePerQ),maxStreak:quizState.maxStreak});
+        showScreen('results-screen');
+    }
+
+    // No-op saveScore to avoid Firebase dependency
+    function saveScore(/*scoreData*/){console.log('saveScore called (stub)')}
+
+    // Download results as image (works on desktop & mobile browsers that allow downloads)
+    async function downloadResults(){
+        try{
+            console.log('Download button clicked');
+            const screenshotWrapper=document.getElementById('screenshot-wrapper');
+            if(!screenshotWrapper){console.warn('No screenshot wrapper found');return}
+            // Ensure wrapper is visible to capture
+            screenshotWrapper.style.display='flex';
+            screenshotWrapper.classList.add('screenshot-wrapper-padded');
+
+            const canvas = await html2canvas(screenshotWrapper, {backgroundColor: null, useCORS: true, scale: 2});
+            const dataUrl = canvas.toDataURL('image/png');
+
+            // Create a link and click it to trigger download
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `Billions_Quiz_Result_${(quizSettings.name||'player').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Cleanup
+            screenshotWrapper.classList.remove('screenshot-wrapper-padded');
+        }catch(err){console.error('Error in downloadResults:',err)}
+    }
+
+    // Share on X (Twitter) — opens composer in new tab. Mobile browsers may block popups if not initiated by user gesture.
+    function shareOnX(){
+        try{
+            console.log('Share on X button clicked');
+            const finalScorePercentage = document.getElementById('final-percentage')?.textContent || '0%';
+            const iqMessage = document.getElementById('intuition-iq-message')?.textContent || '';
+            const difficulty = (quizSettings.difficulty || 'EASY').toUpperCase();
+            const text = encodeURIComponent(`I just completed the Billions Quiz created by @Next_GenAlpha!\n\nMy Score: ${finalScorePercentage}\nIQ Level: ${iqMessage}\nDifficulty: ${difficulty}\n\n Test your knowledge about @Billions_ntwk\n\ngBillions`);
+            const url = `https://twitter.com/intent/tweet?text=${text}`;
+            // Use window.open with target _blank — most browsers will allow this when called from a click handler
+            const win = window.open(url, '_blank');
+            if(!win){
+                // Popup was blocked — fallback: open in same tab
+                window.location.href = url;
             }
-        }
-        
-        // --- LEADERBOARD FILTERING AND RENDERING (UPDATED) ---
+        }catch(err){console.error('Error in shareOnX:',err)}
+    }
 
-        function filterLeaderboard(difficulty) {
-            currentLeaderboardFilter = difficulty;
-            
-            // Update UI elements
-            document.getElementById('leaderboard-title-diff').textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-            
-            document.querySelectorAll('.leaderboard-filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.querySelector(`.leaderboard-filter-btn[data-filter="${difficulty}"]`).classList.add('active');
+    // Wire up button event listeners after functions are defined
+    function wireButtons(){
+        const btnDownload = document.getElementById('btn-download');
+        const btnShare = document.getElementById('btn-share');
+        const btnTry = document.getElementById('btn-try');
+        if(btnDownload) btnDownload.addEventListener('click', downloadResults);
+        if(btnShare) btnShare.addEventListener('click', shareOnX);
+        if(btnTry) btnTry.addEventListener('click', ()=>{ showScreen('quiz-settings-screen'); });
+    }
 
-            // Trigger data load
-            loadLeaderboard();
-        }
+    // Initial setup on load
+    window.addEventListener('load', () => {
+        // Ensure functions exist globally (they do by function declarations), then wire buttons
+        selectDifficulty('easy');
+        showScreen('quiz-settings-screen');
+        wireButtons();
+    });
 
-        async function loadLeaderboard() {
-            if (!isAuthReady || !db) return;
-
-            const leaderboardList = document.getElementById('leaderboard-list');
-            const leaderboardStatus = document.getElementById('leaderboard-status');
-            leaderboardStatus.textContent = "Fetching scores...";
-
-            try {
-                // Query filtered by difficulty and limited to 100
-                const q = query(
-                    collection(db, LEADERBOARD_COLLECTION_PATH), 
-                    where("difficulty", "==", currentLeaderboardFilter), // Filter by difficulty
-                    limit(LEADERBOARD_LIMIT) 
-                );
-                
-                // Use onSnapshot for real-time updates
-                onSnapshot(q, (snapshot) => {
-                    let scores = [];
-                    snapshot.forEach((doc) => {
-                        const data = doc.data();
-                        scores.push(data);
-                    });
-
-                    // Sort locally by score (descending) then by avgTimePerQ (ascending)
-                    scores.sort((a, b) => {
-                        if (b.score !== a.score) {
-                            return b.score - a.score;
-                        }
-                        return a.avgTimePerQ - b.avgTimePerQ;
-                    });
-                    
-                    // Slice to ensure only Top 100 are displayed even if more are fetched/queried without orderBy
-                    const topScores = scores.slice(0, LEADERBOARD_LIMIT);
-
-                    leaderboardList.innerHTML = '';
-                    if (topScores.length === 0) {
-                        leaderboardStatus.style.display = 'block';
-                        leaderboardStatus.textContent = `No ${currentLeaderboardFilter.toUpperCase()} scores yet. Be the first!`;
-                    } else {
-                        leaderboardStatus.style.display = 'none';
-                        topScores.forEach((score, index) => {
-                            const listItem = document.createElement('li');
-                            // Add a visual difference for the top spots
-                            let rankColor = 'text-gray-300';
-                            if (index === 0) rankColor = 'text-yellow-400';
-                            else if (index === 1) rankColor = 'text-gray-400';
-                            else if (index === 2) rankColor = 'text-amber-600';
-
-                            listItem.className = 'flex justify-between items-center text-sm p-2 rounded-lg bg-zinc-900/50';
-                            listItem.innerHTML = `
-                                <span class="font-bold ${rankColor} w-6 text-left">${index + 1}.</span>
-                                <span class="flex-1 font-medium text-white truncate px-2">${score.name}</span>
-                                <span class="text-xs text-cyan-400 font-mono">${score.avgTimePerQ}s AVG</span>
-                                <span class="text-lg font-extrabold text-green-400 ml-4">${score.score}%</span>
-                            `;
-                            leaderboardList.appendChild(listItem);
-                        });
-                    }
-                }, (error) => {
-                    console.error("Error reading leaderboard:", error);
-                    leaderboardStatus.style.display = 'block';
-                    leaderboardStatus.textContent = "Error loading scores: " + error.message;
-                });
-
-            } catch (error) {
-                console.error("Error setting up leaderboard listener:", error);
-                leaderboardStatus.style.display = 'block';
-                leaderboardStatus.textContent = "Error initializing leaderboard. See console.";
-            }
-        }
-
-        async function saveScore(scoreData) {
-            if (!db || !userId) {
-                console.error("Database not ready or User not authenticated.");
-                return;
-            }
-
-            try {
-                await addDoc(collection(db, LEADERBOARD_COLLECTION_PATH), {
-                    ...scoreData,
-                    timestamp: serverTimestamp(),
-                    userId: userId 
-                });
-                console.log("Score saved successfully!");
-            } catch (error) {
-                console.error("Error saving score:", error);
-            }
-        }
-
-        // --- GLOBAL STATE & CONFIG (UNCHANGED) ---
-        const difficultyLevels = {
-            easy: { count: 6, time: 12, name: "Easy" }, 
-            medium: { count: 6, time: 8, name: "Medium" }, 
-            hard: { count: 8, time: 4, name: "Hard" } 
-        };
-
-        let quizSettings = {
-            name: '',
-            difficulty: 'easy', // Default to easy
-            questionCount: difficultyLevels.easy.count,
-            timePerQuestion: difficultyLevels.easy.time,
-        };
-
-        let quizState = {
-            currentQuestionIndex: 0,
-            score: 0, 
-            correctAnswers: 0,
-            incorrectAnswers: 0,
-            timeRemaining: 0, 
-            timerInterval: null,
-            questions: [], 
-            currentStreak: 0,
-            maxStreak: 0,
-            totalTimeTaken: 0, 
-            startTime: Date.now(),
-        };
-
-
-        // --- SCREEN MANAGEMENT ---
-        function showScreen(screenId) {
-            document.getElementById('quiz-settings-screen').classList.add('hidden');
-            document.getElementById('quiz-content').classList.add('hidden');
-            document.getElementById('results-screen').classList.add('hidden');
-            
-            const screen = document.getElementById(screenId);
-            if (screen) {
-                screen.classList.remove('hidden');
-                screen.classList.add('flex');
-            }
-        }
-
-        // --- QUIZ GAME LOGIC (UNCHANGED) ---
-
-        function selectDifficulty(level) {
-            document.querySelectorAll('.diff-btn').forEach(btn => {
-                btn.classList.remove('bg-active-gradient');
-                btn.classList.add('bg-inactive');
-            });
-
-            const selectedBtn = document.getElementById(`btn-diff-${level}`);
-            selectedBtn.classList.remove('bg-inactive');
-            selectedBtn.classList.add('bg-active-gradient');
-
-            quizSettings.difficulty = level;
-            quizSettings.questionCount = difficultyLevels[level].count;
-            quizSettings.timePerQuestion = difficultyLevels[level].time;
-
-            document.getElementById('btn-diff-easy').querySelector('span').textContent = `Easy (${difficultyLevels.easy.count}Q)`;
-            document.getElementById('btn-diff-medium').querySelector('span').textContent = `Medium (${difficultyLevels.medium.count}Q)`;
-            document.getElementById('btn-diff-hard').querySelector('span').textContent = `Hard (${difficultyLevels.hard.count}Q)`;
-            
-            document.getElementById('error-msg').textContent = '';
-        }
-
-        function startGame() {
-            quizSettings.name = document.getElementById('user-name-input').value.trim();
-
-            if (!quizSettings.name) {
-                document.getElementById('error-msg').textContent = 'Please enter your name to begin.';
-                return;
-            }
-            if (!quizSettings.difficulty) {
-                document.getElementById('error-msg').textContent = 'Please select a difficulty level.';
-                return;
-            }
-
-            // Initialize state
-            quizState = {
-                currentQuestionIndex: 0,
-                score: 0, 
-                correctAnswers: 0, 
-                incorrectAnswers: 0,
-                timeRemaining: quizSettings.timePerQuestion,
-                timerInterval: null,
-                questions: [], 
-                currentStreak: 0,
-                maxStreak: 0,
-                totalTimeTaken: 0, 
-                startTime: Date.now(),
-            };
-
-            const selectedQuestions = QUIZ_DATA_BY_DIFFICULTY[quizSettings.difficulty] || [];
-            // Use a local copy of shuffleArray defined later
-            quizState.questions = shuffleArray(selectedQuestions);
-
-
-            // Update UI displays
-            document.getElementById('player-name-display').textContent = quizSettings.name.toUpperCase();
-            document.getElementById('total-q-count').textContent = quizSettings.questionCount;
-            document.getElementById('score-display').textContent = quizState.score;
-            document.getElementById('progress-display').textContent = `1/${quizSettings.questionCount}`;
-            document.getElementById('time-remaining-display').textContent = `${quizSettings.timePerQuestion}s`;
-            
-            showScreen('quiz-content');
-            renderQuestion();
-        }
-        
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
-
-        function renderQuestion() {
-            if (quizState.currentQuestionIndex >= quizState.questions.length) {
-                endGame();
-                return;
-            }
-
-            const q = quizState.questions[quizState.currentQuestionIndex];
-            
-            // Update question info
-            document.getElementById('current-q-num').textContent = quizState.currentQuestionIndex + 1;
-            document.getElementById('progress-display').textContent = `${quizState.currentQuestionIndex + 1}/${quizSettings.questionCount}`;
-            document.getElementById('question-text').textContent = q.question;
-            document.getElementById('feedback-message').textContent = '';
-
-            const choicesContainer = document.getElementById('choices-container');
-            choicesContainer.innerHTML = '';
-
-            const shuffledOptions = shuffleArray([...q.answerOptions]);
-
-            shuffledOptions.forEach((option, index) => {
-                const button = document.createElement('button');
-                button.className = `answer-button w-full text-left p-3 rounded-xl font-medium shadow-md transition-all duration-200`;
-                button.setAttribute('data-option-text', option.text); 
-                button.textContent = option.text;
-                button.onclick = () => handleAnswer(option, button);
-                choicesContainer.appendChild(button);
-            });
-            
-            clearInterval(quizState.timerInterval);
-            quizState.timeRemaining = quizSettings.timePerQuestion;
-            startTimer();
-            updateTimerBar(quizSettings.timePerQuestion);
-        }
-
-        function startTimer() {
-            const timeDisplay = document.getElementById('time-remaining-display');
-            
-            quizState.timerInterval = setInterval(() => {
-                quizState.timeRemaining -= 1;
-                timeDisplay.textContent = `${quizState.timeRemaining}s`;
-                updateTimerBar(quizState.timePerQuestion);
-
-                if (quizState.timeRemaining <= 0) {
-                    clearInterval(quizState.timerInterval);
-                    handleAnswer({ isCorrect: false }, null, true); 
-                }
-            }, 1000);
-        }
-
-        function updateTimerBar(remainingTime) {
-            const timerBar = document.getElementById('timer-bar');
-            const totalTime = quizSettings.timePerQuestion;
-            const percentage = (remainingTime / totalTime) * 100;
-            
-            timerBar.style.transition = 'width 1s linear';
-            timerBar.style.width = `${percentage}%`;
-        }
-
-        function disableAllChoices() {
-            document.querySelectorAll('.answer-button').forEach(btn => {
-                btn.disabled = true;
-                btn.onclick = null; 
-            });
-        }
-
-        function handleAnswer(selectedOption, clickedButton, isTimeout = false) {
-            clearInterval(quizState.timerInterval);
-            disableAllChoices();
-
-            const feedbackMessage = document.getElementById('feedback-message');
-            const questionTimeTaken = quizSettings.timePerQuestion - quizState.timeRemaining;
-            
-            quizState.totalTimeTaken += questionTimeTaken;
-
-            if (selectedOption.isCorrect) {
-                quizState.score += 1; 
-                quizState.correctAnswers += 1;
-                quizState.currentStreak += 1;
-                feedbackMessage.textContent = 'Correct!';
-                feedbackMessage.className = 'mt-4 text-center text-sm font-bold h-6 text-green-400';
-                
-                if (clickedButton) {
-                    clickedButton.classList.remove('answer-button', 'bg-inactive');
-                    clickedButton.classList.add('bg-green-600', 'text-white', 'shadow-green-500/50');
-                }
-            } else {
-                quizState.incorrectAnswers += 1;
-                quizState.maxStreak = Math.max(quizState.maxStreak, quizState.currentStreak);
-                quizState.currentStreak = 0;
-
-                if (isTimeout) {
-                    feedbackMessage.textContent = 'Time Out! Incorrect.';
-                } else {
-                    feedbackMessage.textContent = 'Incorrect.';
-                    if (clickedButton) {
-                        clickedButton.classList.remove('answer-button', 'bg-inactive');
-                        clickedButton.classList.add('bg-red-600', 'text-white', 'shadow-red-500/50');
-                    }
-                }
-                feedbackMessage.className = 'mt-4 text-center text-sm font-bold h-6 text-red-400';
-
-                const q = quizState.questions[quizState.currentQuestionIndex];
-                const correctOption = q.answerOptions.find(option => option.isCorrect);
-                
-                const correctBtn = Array.from(document.querySelectorAll('#choices-container button')).find(
-                    btn => btn.getAttribute('data-option-text') === correctOption.text
-                );
-
-                if(correctBtn) {
-                   correctBtn.classList.add('border-2', 'border-green-400', 'shadow-lg', 'shadow-green-500/30', 'bg-zinc-700/50');
-                }
-            }
-
-            document.getElementById('score-display').textContent = quizState.score;
-            
-            quizState.maxStreak = Math.max(quizState.maxStreak, quizState.currentStreak);
-
-            setTimeout(() => {
-                quizState.currentQuestionIndex += 1;
-                if (quizState.currentQuestionIndex < quizState.questions.length) {
-                    renderQuestion();
-                } else {
-                    endGame(); 
-                }
-            }, 1500);
-        }
-
-        function endGame() {
-            clearInterval(quizState.timerInterval);
-            
-            const totalQuestions = quizSettings.questionCount;
-            const finalScorePercentage = totalQuestions > 0 ? Math.round((quizState.correctAnswers / totalQuestions) * 100) : 0;
-            const avgTimePerQ = totalQuestions > 0 ? (quizState.totalTimeTaken / totalQuestions).toFixed(1) : 0;
-            
-            let iqMessage, resultText;
-            if (finalScorePercentage >= 80) {
-                // Modified: Removed "AGENT" and "trusted validator" reference
-                iqMessage = "MASTER BILLIONS KNOWLEDGE";
-                resultText = "Exceptional mastery of the Billions Network Identity concepts. You've earned your place in the Trust Layer!";
-            } else if (finalScorePercentage >= 60) {
-                 // Modified: Removed "AGENT"
-                iqMessage = "HIGH KNOWLEDGE LEVEL";
-                resultText = "Strong comprehension of the core Identity and Verification concepts. You understand Proof of Uniqueness well. ";
-            } else if (finalScorePercentage >= 40) {
-                iqMessage = "DEVELOPING KNOWLEDGE";
-                resultText = "Start paying closer attention to the key principles of the Identity and Verification mechanisms. Review the documentation!";
-            } else {
-                // Modified: Removed "AGENT"
-                iqMessage = "NOVICE LEVEL";
-                resultText = "Your knowledge base needs to be solidified. Review the core concepts and try again!";
-            }
-
-            // Update result screen elements
-            document.getElementById('player-name-result').textContent = quizSettings.name;
-            document.getElementById('player-name-result-card').textContent = quizSettings.name;
-            document.getElementById('level-q-count-result').textContent = `${quizSettings.difficulty.toUpperCase()} LEVEL • ${totalQuestions} QUESTIONS`;
-            document.getElementById('final-percentage').textContent = `${finalScorePercentage}%`;
-            document.getElementById('intuition-iq-message').textContent = iqMessage;
-            document.getElementById('result-total-questions').textContent = totalQuestions;
-            document.getElementById('result-time-per-q').textContent = `${avgTimePerQ}s`;
-            document.getElementById('result-max-streak').textContent = quizState.maxStreak;
-            document.getElementById('result-message').textContent = resultText;
-            document.getElementById('result-date').textContent = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-            const screenshotWrapper = document.getElementById('screenshot-wrapper');
-            screenshotWrapper.classList.remove('hidden');
-            screenshotWrapper.classList.add('flex'); 
-
-            // Save score to leaderboard
-            saveScore({
-                name: quizSettings.name,
-                score: finalScorePercentage,
-                difficulty: quizSettings.difficulty,
-                avgTimePerQ: parseFloat(avgTimePerQ),
-                maxStreak: quizState.maxStreak
-            });
-
-            showScreen('results-screen');
-        }
-
-        // --- DOWNLOAD AND SHARE FUNCTIONS (UPDATED) ---
-
-        async function downloadResults() {
-            const resultsCardContainer = document.getElementById('results-screen');
-            const resultsCard = document.getElementById('results-card');
-            const screenshotWrapper = document.getElementById('screenshot-wrapper');
-            const appContainer = document.getElementById('app-container');
-
-            // 1. Prepare for screenshot: add wrapper for curved edges and gap
-            screenshotWrapper.classList.remove('flex');
-            screenshotWrapper.classList.add('screenshot-wrapper-padded'); 
-            appContainer.classList.add('screenshot-container-padding'); 
-            
-            try {
-                const canvas = await html2canvas(screenshotWrapper, {
-                    backgroundColor: null, 
-                    useCORS: true,
-                    scale: 2 
-                });
-
-                const dataUrl = canvas.toDataURL('image/png');
-                const link = document.createElement('a');
-                link.href = dataUrl;
-                link.download = `Billions_Quiz_Result_${quizSettings.name.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (error) {
-                console.error("Error generating screenshot:", error);
-            } finally {
-                // 3. Clean up: restore original styles
-                screenshotWrapper.classList.remove('screenshot-wrapper-padded');
-                screenshotWrapper.classList.add('flex'); 
-                appContainer.classList.remove('screenshot-container-padding');
-            }
-        }
-
-        function shareOnX() {
-            const finalScorePercentage = document.getElementById('final-percentage').textContent;
-            const iqMessage = document.getElementById('intuition-iq-message').textContent;
-            const difficulty = quizSettings.difficulty.toUpperCase();
-            
-            // NOTE: The app link is dynamically determined by the hosting environment, 
-            // but we must use a placeholder or assume a variable for the tweet text.
-            // Since we don't have access to the Canvas link, we'll use a descriptive placeholder.
-            const appLinkPlaceholder = "Check out the Billions Quiz!";
-
-            // --- START MODIFIED TEXT ---
-            const text = encodeURIComponent(
-                `I just completed the Billions Quiz!\n\n` +
-                `My Score: ${finalScorePercentage}\n` +
-                `IQ Level: ${iqMessage}\n` +
-                `Difficulty: ${difficulty}\n\n` +
-                `Share your results and join the Trust Layer!\n\n` +
-                `${appLinkPlaceholder}\n\n` + // Placeholder link text
-                `@billions_ntwk @jgonzalezferrer`
-            );
-            // --- END MODIFIED TEXT ---
-            
-            window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
-        }
-
-        // --- INITIALIZATION ---
-        window.onload = () => {
-            initFirebase();
-            // Set initial selection visually for quiz settings
-            selectDifficulty('easy');
-            // Set initial selection visually for leaderboard filter
-            filterLeaderboard('easy');
-            showScreen('quiz-settings-screen');
-        };
-
-    </script>
+</script>
 
 </body>
 </html>
